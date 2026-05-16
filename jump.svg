@@ -1,0 +1,200 @@
+<svg viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <style>
+    body { margin: 0; overflow: hidden; background: #222; }
+    svg { display: block; background: linear-gradient(to bottom, #87CEEB, #E0F6FF); cursor: crosshair; }
+    #game-over { font-family: 'Arial', sans-serif; font-weight: bold; fill: #333; text-anchor: middle; pointer-events: none; }
+  </style>
+
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Game Elements -->
+  <g id="world">
+    <g id="platforms"></g>
+    <g id="player-group">
+      <circle id="player" r="15" fill="#4CAF50" stroke="#2E7D32" stroke-width="3" filter="url(#glow)">
+        <title>Jumper</title>
+        <!-- Eyes -->
+        <circle cx="-5" cy="-5" r="2" fill="white" />
+        <circle cx="5" cy="-5" r="2" fill="white" />
+      </circle>
+    </g>
+  </g>
+
+  <text id="score" x="20" y="30" font-family="Arial" font-size="24" fill="#333">Score: 0 | Lvl: 1 | High: 0</text>
+  <text id="game-over" x="200" y="300" font-size="32" visibility="hidden">GAME OVER!&#13;Click to Restart</text>
+
+  <script><![CDATA[
+    const svg = document.querySelector('svg');
+    const world = document.getElementById('world');
+    const platformsElem = document.getElementById('platforms');
+    const playerElem = document.getElementById('player');
+    const scoreElem = document.getElementById('score');
+    const gameOverElem = document.getElementById('game-over');
+
+    // Game Constants
+    const GRAVITY = 0.25;
+    const JUMP_FORCE = -9;
+    const MOVE_SPEED = 5;
+    const PLATFORM_COUNT = 8;
+    const MIN_PLATFORM_WIDTH = 30;
+    const MAX_PLATFORM_WIDTH = 90;
+    const PLATFORM_HEIGHT = 10;
+    const VIEW_HEIGHT = 600;
+    const VIEW_WIDTH = 400;
+
+    // State
+    let player = { x: 200, y: 500, vy: 0, vx: 0, r: 15 };
+    let platforms = [];
+    let score = 0;
+    let highScore = 0;
+    let level = 1;
+    let isGameOver = false;
+    let keys = {};
+
+    // Audio Context for sound synthesis
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioCtx();
+
+    function playSound(type) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'jump') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+      } else if (type === 'fail') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      }
+    }
+
+    function initPlatforms() {
+      platforms = [];
+      platformsElem.innerHTML = '';
+      for (let i = 0; i < PLATFORM_COUNT; i++) {
+        const w = Math.floor(Math.random() * (MAX_PLATFORM_WIDTH - MIN_PLATFORM_WIDTH + 1)) + MIN_PLATFORM_WIDTH;
+        createPlatform(Math.random() * (VIEW_WIDTH - w), (VIEW_HEIGHT / PLATFORM_COUNT) * i, w);
+      }
+      // Ensure a starting platform
+      platforms[PLATFORM_COUNT - 1].x = 170;
+      platforms[PLATFORM_COUNT - 1].y = 550;
+      updatePlatformElements();
+    }
+
+    function createPlatform(x, y, width) {
+      const p = { x, y, width, id: `p${platforms.length}` };
+      platforms.push(p);
+    }
+
+    function updatePlatformElements() {
+      platformsElem.innerHTML = platforms.map(p =>
+        `<rect id="${p.id}" x="${p.x}" y="${p.y}" width="${p.width || 60}" height="${PLATFORM_HEIGHT}" fill="#BDBDBD" rx="5" stroke="#757575" stroke-width="1" />`
+      ).join('');
+    }
+
+    function update() {
+      if (isGameOver) return;
+
+      // Input
+      if (keys['ArrowLeft'] || keys['a']) player.vx = -MOVE_SPEED;
+      else if (keys['ArrowRight'] || keys['d']) player.vx = MOVE_SPEED;
+      else player.vx = 0;
+
+      // Physics
+      player.vy += GRAVITY;
+      player.x += player.vx;
+      player.y += player.vy;
+
+      // Wrap edges
+      if (player.x < 0) player.x = VIEW_WIDTH;
+      if (player.x > VIEW_WIDTH) player.x = 0;
+
+      // Platform Collision (only when falling)
+      if (player.vy > 0) {
+        platforms.forEach(p => {
+          if (player.x + player.r > p.x &&
+              player.x - player.r < p.x + (p.width || 60) &&
+              player.y + player.r > p.y &&
+              player.y + player.r < p.y + PLATFORM_HEIGHT + 10) {
+            player.vy = JUMP_FORCE;
+            playSound('jump');
+          }
+        });
+      }
+
+      // Scrolling
+      if (player.y < VIEW_HEIGHT / 2) {
+        let diff = VIEW_HEIGHT / 2 - player.y;
+        player.y = VIEW_HEIGHT / 2;
+        score += Math.floor(diff);
+        level = Math.floor(score / 1000) + 1;
+        if (score > highScore) highScore = score;
+        scoreElem.textContent = `Score: ${score} | Lvl: ${level} | High: ${highScore}`;
+
+        platforms.forEach(p => {
+          p.y += diff;
+          if (p.y > VIEW_HEIGHT) {
+            p.y = 0;
+            p.width = Math.floor(Math.random() * (MAX_PLATFORM_WIDTH - MIN_PLATFORM_WIDTH + 1)) + MIN_PLATFORM_WIDTH;
+            p.x = Math.random() * (VIEW_WIDTH - p.width);
+          }
+        });
+        updatePlatformElements();
+      }
+
+      // Game Over
+      if (player.y > VIEW_HEIGHT + player.r) {
+        isGameOver = true;
+        gameOverElem.setAttribute('visibility', 'visible');
+        playSound('fail');
+      }
+
+      // Render player
+      playerElem.setAttribute('cx', player.x);
+      playerElem.setAttribute('cy', player.y);
+
+      requestAnimationFrame(update);
+    }
+
+    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keyup', e => keys[e.key] = false);
+
+    svg.addEventListener('click', () => {
+      if (isGameOver) {
+        isGameOver = false;
+        score = 0;
+        level = 1;
+        scoreElem.textContent = `Score: 0 | Lvl: 1 | High: ${highScore}`;
+        gameOverElem.setAttribute('visibility', 'hidden');
+        player = { x: 200, y: 500, vy: 0, vx: 0, r: 15 };
+        initPlatforms();
+        update();
+      } else if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    });
+
+    initPlatforms();
+    scoreElem.textContent = `Score: 0 | Lvl: 1 | High: ${highScore}`;
+    update();
+  ]]></script>
+</svg>
