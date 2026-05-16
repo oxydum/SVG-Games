@@ -1,0 +1,227 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" style="background: #000; font-family: 'Courier New', Courier, monospace;">
+    <!-- Space Background -->
+    <rect width="600" height="800" fill="#000" />
+
+    <!-- Stars -->
+    <g id="stars" fill="white"></g>
+
+    <!-- Game Area -->
+    <g id="game-world">
+        <!-- Player Ship -->
+        <g id="player" transform="translate(300, 750)">
+            <path d="M -15 10 L 0 -20 L 15 10 Z" fill="#00ff00" stroke="#fff" stroke-width="1" />
+            <rect x="-5" y="10" width="10" height="5" fill="#00ff00" />
+        </g>
+
+        <!-- Projectiles and Aliens -->
+        <g id="bullets"></g>
+        <g id="aliens"></g>
+    </g>
+
+    <!-- UI -->
+    <text x="20" y="40" font-size="24" fill="#00ff00" id="score-text">SCORE: 0</text>
+    <text x="300" y="40" font-size="24" fill="#00ff00" text-anchor="middle" id="level-text">LEVEL: 1</text>
+    <text x="580" y="40" font-size="24" fill="#00ff00" text-anchor="end" id="lives-text">LIVES: 3</text>
+
+    <!-- Overlay -->
+    <g id="overlay" style="cursor:pointer">
+        <rect x="0" y="0" width="600" height="800" fill="rgba(0,0,0,0.8)" />
+        <rect x="150" y="350" width="300" height="120" rx="15" fill="#004400" stroke="#00ff00" stroke-width="2" />
+        <text x="300" y="390" font-size="32" font-weight="bold" fill="#00ff00" text-anchor="middle" pointer-events="none">SPACE INVADERS</text>
+        <text x="300" y="430" font-size="18" fill="#fff" text-anchor="middle" pointer-events="none">Click to Start | Move Mouse to Aim</text>
+        <text x="300" y="450" font-size="14" fill="#00ff00" text-anchor="middle" pointer-events="none">Press Space or Click to Fire</text>
+    </g>
+
+    <script type="text/javascript">
+        <![CDATA[
+        const playerEl = document.getElementById('player');
+        const bulletsContainer = document.getElementById('bullets');
+        const aliensContainer = document.getElementById('aliens');
+        const scoreEl = document.getElementById('score-text');
+        const levelEl = document.getElementById('level-text');
+        const livesEl = document.getElementById('lives-text');
+        const overlay = document.getElementById('overlay');
+        const starsContainer = document.getElementById('stars');
+
+        let score = 0;
+        let level = 1;
+        let lives = 3;
+        let gameActive = false;
+        let playerX = 300;
+        let bullets = [];
+        let aliens = [];
+        let alienDirection = 1;
+        let alienSpeed = 1.5;
+
+        let lastFireTime = 0;
+        const FIRE_COOLDOWN = 300; // ms between shots
+
+        // Alien shapes as paths (simplified pixel art)
+        const ALIEN_SHAPES = [
+            "M 0,0 L 30,0 L 30,10 L 25,10 L 25,15 L 20,15 L 20,10 L 10,10 L 10,15 L 5,15 L 5,10 L 0,10 Z", // Basic
+            "M 5,0 L 25,0 L 25,15 L 20,15 L 20,20 L 10,20 L 10,15 L 0,15 L 0,0 Z", // Squat
+            "M 0,5 L 10,5 L 10,0 L 20,0 L 20,5 L 30,5 L 30,15 L 20,15 L 20,20 L 10,20 L 10,15 L 0,15 Z" // Wide
+        ];
+        const ALIEN_COLORS = ['#fff', '#f0f', '#0ff', '#ff0'];
+
+        for(let i=0; i<50; i++) {
+            const star = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            star.setAttribute('cx', Math.random() * 600);
+            star.setAttribute('cy', Math.random() * 800);
+            star.setAttribute('r', Math.random() * 1.5);
+            starsContainer.appendChild(star);
+        }
+
+        function createAliens() {
+            aliensContainer.innerHTML = '';
+            aliens = [];
+            const rows = Math.min(5 + Math.floor(level/2), 8);
+            const cols = 8;
+            const spacingX = 60;
+            const spacingY = 45;
+            const offsetX = (600 - (cols * spacingX)) / 2;
+            const offsetY = 80;
+
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    const shapeIdx = r % ALIEN_SHAPES.length;
+                    const colorIdx = r % ALIEN_COLORS.length;
+
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path.setAttribute('d', ALIEN_SHAPES[shapeIdx]);
+                    path.setAttribute('fill', ALIEN_COLORS[colorIdx]);
+                    path.setAttribute('stroke', '#000');
+                    path.setAttribute('stroke-width', '1');
+
+                    const x = offsetX + c * spacingX;
+                    const y = offsetY + r * spacingY;
+
+                    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    g.setAttribute('transform', `translate(${x}, ${y})`);
+                    g.appendChild(path);
+
+                    aliensContainer.appendChild(g);
+                    aliens.push({ x, y, el: g, active: true, width: 30, height: 20 });
+                }
+            }
+        }
+
+        function fire() {
+            if (!gameActive) return;
+
+            const now = Date.now();
+            if (now - lastFireTime < FIRE_COOLDOWN) return;
+            lastFireTime = now;
+
+            const bullet = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            bullet.setAttribute('width', '3');
+            bullet.setAttribute('height', '15');
+            bullet.setAttribute('fill', '#00ff00');
+            bulletsContainer.appendChild(bullet);
+            bullets.push({ x: playerX, y: 740, el: bullet });
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            playerEl.setAttribute('transform', `translate(${playerX}, 750)`);
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.y -= 7;
+                b.el.setAttribute('x', b.x - 1.5);
+                b.el.setAttribute('y', b.y);
+
+                if (b.y < 0) {
+                    b.el.remove();
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                for (let j = 0; j < aliens.length; j++) {
+                    const a = aliens[j];
+                    if (a.active && b.x > a.x && b.x < a.x + a.width && b.y > a.y && b.y < a.y + a.height) {
+                        a.active = false;
+                        a.el.setAttribute('visibility', 'hidden');
+                        b.el.remove();
+                        bullets.splice(i, 1);
+                        score += 10;
+                        scoreEl.textContent = `SCORE: ${score}`;
+                        break;
+                    }
+                }
+            }
+
+            let hitWall = false;
+            aliens.forEach(a => {
+                if (!a.active) return;
+                a.x += alienSpeed * alienDirection;
+                if (a.x <= 10 || a.x >= 560) hitWall = true;
+                a.el.setAttribute('transform', `translate(${a.x}, ${a.y})`);
+            });
+
+            if (hitWall) {
+                alienDirection *= -1;
+                aliens.forEach(a => {
+                    if (a.active) {
+                        a.y += 20;
+                        a.el.setAttribute('transform', `translate(${a.x}, ${a.y})`);
+                    }
+                });
+            }
+
+            let activeAliens = aliens.filter(a => a.active);
+            if (activeAliens.length === 0) {
+                level++;
+                levelEl.textContent = `LEVEL: ${level}`;
+                alienSpeed += 0.5;
+                createAliens();
+            }
+
+            aliens.forEach(a => {
+                if (a.active && a.y > 720) {
+                    gameActive = false;
+                    overlay.setAttribute('visibility', 'visible');
+                    overlay.querySelector('text').textContent = "EARTH INVADED!";
+                }
+            });
+
+            requestAnimationFrame(update);
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            const rect = document.querySelector('svg').getBoundingClientRect();
+            playerX = e.clientX - rect.left;
+            if (playerX < 15) playerX = 15;
+            if (playerX > 585) playerX = 585;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                fire();
+            }
+        });
+
+        overlay.addEventListener('click', () => {
+            gameActive = true;
+            score = 0;
+            level = 1;
+            alienSpeed = 1.5;
+            scoreEl.textContent = `SCORE: 0`;
+            levelEl.textContent = `LEVEL: 1`;
+            overlay.setAttribute('visibility', 'hidden');
+            createAliens();
+            bulletsContainer.innerHTML = '';
+            bullets = [];
+            update();
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (gameActive && e.target.id !== 'overlay') fire();
+        });
+
+        createAliens();
+        ]]>
+    </script>
+</svg>

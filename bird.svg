@@ -1,0 +1,226 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600" style="background: #70c5ce; font-family: 'Segoe UI', Arial, sans-serif;">
+    <!-- Background -->
+    <rect width="400" height="600" fill="#70c5ce" />
+
+    <!-- Scenery (Clouds) -->
+    <g fill="#fff" opacity="0.8">
+        <circle cx="50" cy="100" r="30" />
+        <circle cx="80" cy="100" r="30" />
+        <circle cx="70" cy="120" r="30" />
+
+        <circle cx="300" cy="150" r="40" />
+        <circle cx="340" cy="150" r="40" />
+        <circle cx="320" cy="170" r="40" />
+    </g>
+
+    <!-- Game World -->
+    <g id="game-world">
+        <g id="pipes"></g>
+
+        <!-- Bird -->
+        <g id="bird" transform="translate(50, 300)">
+            <circle r="15" fill="#f4d03f" stroke="#000" stroke-width="2" />
+            <circle cx="7" cy="-5" r="3" fill="#fff" stroke="#000" stroke-width="1" />
+            <circle cx="7" cy="-5" r="1" fill="#000" />
+            <path d="M 10 2 L 18 2 L 15 6 Z" fill="#e67e22" stroke="#000" stroke-width="1" />
+        </g>
+    </g>
+
+    <!-- UI -->
+    <text x="200" y="50" font-size="32" font-weight="bold" fill="white" text-anchor="middle" stroke="#000" stroke-width="1" id="score-text">0</text>
+    <text x="200" y="85" font-size="18" font-weight="bold" fill="white" text-anchor="middle" stroke="#000" stroke-width="1" id="level-text">LEVEL: 1</text>
+    <text x="200" y="110" font-size="14" fill="white" text-anchor="middle" stroke="#000" stroke-width="1" id="high-score-text">BEST: 0</text>
+
+    <!-- Overlay -->
+    <g id="overlay" style="cursor:pointer">
+        <rect x="0" y="0" width="400" height="600" fill="rgba(0,0,0,0.5)" />
+        <rect x="100" y="250" width="200" height="120" rx="15" fill="#fff" stroke="#000" stroke-width="2" />
+        <text x="200" y="280" font-size="24" font-weight="bold" fill="#333" text-anchor="middle" pointer-events="none">FLAPPY SVG</text>
+        <text x="200" y="310" font-size="16" fill="#666" text-anchor="middle" pointer-events="none">Click or Space to Jump</text>
+        <text x="200" y="340" font-size="14" fill="#3498db" text-anchor="middle" pointer-events="none">CLICK TO START</text>
+    </g>
+
+    <script type="text/javascript">
+        <![CDATA[
+        const birdEl = document.getElementById('bird');
+        const pipesContainer = document.getElementById('pipes');
+        const scoreEl = document.getElementById('score-text');
+        const levelEl = document.getElementById('level-text');
+        const highEl = document.getElementById('high-score-text');
+        const overlay = document.getElementById('overlay');
+
+        let score = 0;
+        let highScore = 0;
+        let level = 1;
+        let gameActive = false;
+        let birdY = 300;
+        let birdVY = 0;
+        const GRAVITY = 0.25;
+        const JUMP = -5.5;
+        let pipes = [];
+        let frame = 0;
+        let pipeSpeed = 3;
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'jump') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(261.63, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'score') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(55, audioCtx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        function createPipe() {
+            const gap = Math.max(120, 160 - (level * 5)); // Gap narrows as level increases
+            const minHeight = 50;
+            const maxHeight = 600 - gap - minHeight;
+            const topH = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+            const bottomY = topH + gap;
+
+            const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+            const topPipe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            topPipe.setAttribute('x', 400);
+            topPipe.setAttribute('y', 0);
+            topPipe.setAttribute('width', 50);
+            topPipe.setAttribute('height', topH);
+            topPipe.setAttribute('fill', '#2ecc71');
+            topPipe.setAttribute('stroke', '#000');
+            topPipe.setAttribute('stroke-width', '2');
+
+            const bottomPipe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            bottomPipe.setAttribute('x', 400);
+            bottomPipe.setAttribute('y', bottomY);
+            bottomPipe.setAttribute('width', 50);
+            bottomPipe.setAttribute('height', 600 - bottomY);
+            bottomPipe.setAttribute('fill', '#2ecc71');
+            bottomPipe.setAttribute('stroke', '#000');
+            bottomPipe.setAttribute('stroke-width', '2');
+
+            group.appendChild(topPipe);
+            group.appendChild(bottomPipe);
+            pipesContainer.appendChild(group);
+
+            pipes.push({ x: 400, topH: topH, bottomY: bottomY, el: group, passed: false });
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            birdVY += GRAVITY;
+            birdY += birdVY;
+            birdEl.setAttribute('transform', `translate(50, ${birdY})`);
+
+            if (birdY < 0 || birdY > 585) {
+                gameOver();
+            }
+
+            frame++;
+            if (frame % 100 === 0) createPipe();
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                const p = pipes[i];
+                p.x -= pipeSpeed;
+                p.el.setAttribute('transform', `translate(${p.x - 400}, 0)`);
+
+                if (50 + 15 > p.x && 50 - 15 < p.x + 50) {
+                    if (birdY - 15 < p.topH || birdY + 15 > p.bottomY) {
+                        gameOver();
+                    }
+                }
+
+                if (!p.passed && p.x < 50) {
+                    p.passed = true;
+                    score++;
+                    scoreEl.textContent = score;
+                    playSound('score');
+
+                    // Level up every 5 points
+                    if (score % 5 === 0) {
+                        level++;
+                        levelEl.textContent = `LEVEL: ${level}`;
+                        pipeSpeed += 0.2;
+                    }
+                }
+
+                if (p.x < -60) {
+                    p.el.remove();
+                    pipes.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        function gameOver() {
+            gameActive = false;
+            playSound('hit');
+            if (score > highScore) {
+                highScore = score;
+                highEl.textContent = `BEST: ${highScore}`;
+            }
+            overlay.setAttribute('visibility', 'visible');
+            overlay.querySelector('text').textContent = "GAME OVER!";
+        }
+
+        function jump() {
+            if (!gameActive) return;
+            birdVY = JUMP;
+            playSound('jump');
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                jump();
+            }
+        });
+
+        overlay.addEventListener('click', () => {
+            audioCtx.resume();
+            score = 0;
+            level = 1;
+            pipeSpeed = 3;
+            birdY = 300;
+            birdVY = 0;
+            pipes = [];
+            pipesContainer.innerHTML = '';
+            scoreEl.textContent = '0';
+            levelEl.textContent = `LEVEL: 1`;
+            gameActive = true;
+            overlay.setAttribute('visibility', 'hidden');
+            update();
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (gameActive && e.target.id !== 'overlay') jump();
+        });
+        ]]>
+    </script>
+</svg>

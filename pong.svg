@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" style="background: #000; cursor: none;">
+    <!-- Game Elements -->
+    <rect width="600" height="400" fill="black" />
+    <line x1="300" y1="50" x2="300" y2="350" stroke="white" stroke-dasharray="10,10" stroke-width="2" />
+
+    <text x="150" y="50" id="scoreL" fill="white" font-family="monospace" font-size="30" text-anchor="middle">0</text>
+    <text x="450" y="50" id="scoreR" fill="white" font-family="monospace" font-size="30" text-anchor="middle">0</text>
+
+    <rect id="pL" x="10" y="150" width="15" height="80" fill="white" />
+    <rect id="pR" x="575" y="150" width="15" height="80" fill="white" />
+    <circle id="ball" cx="300" cy="200" r="8" fill="white" />
+
+    <script type="text/ecmascript">
+        <![CDATA[
+        const ballEl = document.getElementById('ball');
+        const pLEl = document.getElementById('pL');
+        const pREl = document.getElementById('pR');
+        const sLEl = document.getElementById('scoreL');
+        const sREl = document.getElementById('scoreR');
+
+        let bx = 300, by = 200, bvx = 3, bvy = 3;
+        let ly = 150, ry = 150;
+        let sl = 0, sr = 0;
+        const ph = 80;
+
+        window.addEventListener('mousemove', (e) => {
+            const svg = document.querySelector('svg');
+            const svgRect = svg.getBoundingClientRect();
+            ry = e.clientY - svgRect.top - ph / 2;
+            if (ry < 0) ry = 0;
+            if (ry > 320) ry = 320;
+        });
+
+        function reset() {
+            bx = 300; by = 200;
+            bvx = (Math.random() > 0.5 ? 3 : -3);
+            bvy = (Math.random() > 0.5 ? 3 : -3);
+        }
+
+        function update() {
+            bx += bvx; by += bvy;
+            if (by <= 8 || by >= 392) bvy *= -1;
+
+            if (bx <= 25 && by > ly && by < ly + ph) {
+                bvx *= -1.1;
+                // Add slight English to ball based on where it hit the paddle
+                bvy += (by - (ly + ph / 2)) * 0.1;
+            } else if (bx >= 575 && by > ry && by < ry + ph) {
+                bvx *= -1.1;
+                bvy += (by - (ry + ph / 2)) * 0.1;
+            }
+
+            if (bx < 0) { sr++; sREl.textContent = sr; reset(); }
+            else if (bx > 600) { sl++; sLEl.textContent = sl; reset(); }
+
+            // ENHANCED AI:
+            // 1. Increases speed as ball gets closer to its side
+            // 2. Better tracking of ball center
+            const distToSymmetry = 300 - bx;
+            const aiSpeed = bx < 300 ? 3 : 5.5; // Be more aggressive when ball is coming
+
+            const targetY = by - ph / 2;
+            if (ly < targetY) ly += aiSpeed;
+            else if (ly > targetY) ly -= aiSpeed;
+
+            if (ly < 0) ly = 0; if (ly > 320) ly = 320;
+
+            ballEl.setAttribute('cx', bx);
+            ballEl.setAttribute('cy', by);
+            pLEl.setAttribute('y', ly);
+            pREl.setAttribute('y', ry);
+
+            requestAnimationFrame(update);
+        }
+        update();
+        ]]>
+    </script>
+</svg>

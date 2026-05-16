@@ -1,0 +1,252 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="650" viewBox="0 0 500 650" style="background: #c0c0c0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <!-- Retro Windows Style Background -->
+    <rect width="500" height="650" fill="#c0c0c0" />
+
+    <!-- Header Area -->
+    <rect x="20" y="20" width="460" height="60" rx="5" fill="#dfdfdf" stroke="#808080" stroke-width="2" />
+    <text x="250" y="55" font-size="24" font-weight="bold" fill="#000" text-anchor="middle">MINESWEEPER SVG</text>
+
+    <!-- Status Bar -->
+    <g transform="translate(100, 90)">
+        <rect x="0" y="0" width="300" height="40" fill="#c0c0c0" stroke="#808080" stroke-width="2" />
+        <rect x="5" y="5" width="140" height="30" fill="#000" />
+        <text x="75" y="25" font-size="20" font-family="monospace" fill="#ff0000" text-anchor="middle">MINES: <tspan id="mine-count">0</tspan></text>
+
+        <rect x="155" y="5" width="140" height="30" fill="#000" />
+        <text x="225" y="25" font-size="20" font-family="monospace" fill="#ff0000" text-anchor="middle">TIME: <tspan id="timer">0</tspan></text>
+    </g>
+
+    <!-- Game Board Container -->
+    <g id="board-container" transform="translate(50, 140)">
+        <rect width="400" height="400" fill="#808080" stroke="#000" stroke-width="3" />
+        <g id="cells"></g>
+    </g>
+
+    <!-- Action Buttons -->
+    <g transform="translate(150, 560)">
+        <rect id="btn-restart" x="0" y="0" width="200" height="50" rx="10" fill="#4a90e2" style="cursor:pointer" stroke="#2a60a2" stroke-width="2" />
+        <text x="100" y="32" font-size="20" font-weight="bold" fill="white" text-anchor="middle" pointer-events="none">RESTART GAME</text>
+    </g>
+
+    <!-- Overlay -->
+    <g id="overlay" visibility="hidden" style="cursor:pointer">
+        <rect x="0" y="0" width="500" height="650" fill="rgba(0,0,0,0.7)" />
+        <rect x="150" y="250" width="200" height="120" rx="15" fill="white" />
+        <text id="result-text" x="250" y="300" font-size="24" font-weight="bold" fill="#333" text-anchor="middle">GAME OVER!</text>
+        <text x="250" y="340" font-size="16" fill="#666" text-anchor="middle">Click to Play Again</text>
+    </g>
+
+    <script type="text/javascript">
+        <![CDATA[
+        const cellsContainer = document.getElementById('cells');
+        const mineCountEl = document.getElementById('mine-count');
+        const timerEl = document.getElementById('timer');
+        const overlay = document.getElementById('overlay');
+        const resultText = document.getElementById('result-text');
+        const btnRestart = document.getElementById('btn-restart');
+
+        const GRID_SIZE = 10; // 10x10
+        const CELL_SIZE = 40;
+        const MINE_TOTAL = 15;
+
+        let grid = [];
+        let gameActive = false;
+        let timerInterval = null;
+        let secondsElapsed = 0;
+        let minesFlagged = 0;
+
+        function initGame() {
+            gameActive = true;
+            secondsElapsed = 0;
+            minesFlagged = 0;
+            timerEl.textContent = '0';
+            mineCountEl.textContent = MINE_TOTAL;
+            overlay.setAttribute('visibility', 'hidden');
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                timerEl.textContent = secondsElapsed;
+            }, 1000);
+
+            // Create Grid Logic
+            grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0).map(() => ({
+                isMine: false,
+                revealed: false,
+                flagged: false,
+                neighborMines: 0
+            })));
+
+            // Place Mines
+            let minesPlaced = 0;
+            while (minesPlaced < MINE_TOTAL) {
+                let r = Math.floor(Math.random() * GRID_SIZE);
+                let c = Math.floor(Math.random() * GRID_SIZE);
+                if (!grid[r][c].isMine) {
+                    grid[r][c].isMine = true;
+                    minesPlaced++;
+                }
+            }
+
+            // Calculate Neighbors
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (grid[r][c].isMine) continue;
+                    let count = 0;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            let nr = r + dr, nc = c + dc;
+                            if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && grid[nr][nc].isMine) {
+                                count++;
+                            }
+                        }
+                    }
+                    grid[r][c].neighborMines = count;
+                }
+            }
+            drawBoard();
+        }
+
+        function drawBoard() {
+            cellsContainer.innerHTML = '';
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = grid[r][c];
+                    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    g.setAttribute('style', 'cursor:pointer');
+
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute('x', c * CELL_SIZE);
+                    rect.setAttribute('y', r * CELL_SIZE);
+                    rect.setAttribute('width', CELL_SIZE);
+                    rect.setAttribute('height', CELL_SIZE);
+                    rect.setAttribute('stroke', '#808080');
+                    rect.setAttribute('stroke-width', '1');
+
+                    // Visual style based on state
+                    if (cell.revealed) {
+                        rect.setAttribute('fill', '#bdbdbd');
+                    } else {
+                        rect.setAttribute('fill', '#c0c0c0');
+                        // 3D Bevel effect
+                        const bevel = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        bevel.setAttribute('d', `M ${c*CELL_SIZE} ${r*CELL_SIZE} L ${c*CELL_SIZE+CELL_SIZE} ${r*CELL_SIZE} L ${c*CELL_SIZE+CELL_SIZE} ${r*CELL_SIZE+CELL_SIZE} L ${c*CELL_SIZE} ${r*CELL_SIZE+CELL_SIZE} Z`);
+                        bevel.setAttribute('fill', 'none');
+                        bevel.setAttribute('stroke', 'white');
+                        bevel.setAttribute('stroke-width', '1');
+                        // Simplified: just use border in CSS/SVG
+                    }
+
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute('x', c * CELL_SIZE + CELL_SIZE / 2);
+                    text.setAttribute('y', r * CELL_SIZE + CELL_SIZE / 2);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('dominant-baseline', 'central');
+                    text.setAttribute('font-weight', 'bold');
+                    text.setAttribute('font-size', '16');
+
+                    if (cell.revealed) {
+                        if (cell.isMine) {
+                            text.textContent = '💣';
+                            rect.setAttribute('fill', 'red');
+                        } else if (cell.neighborMines > 0) {
+                            text.textContent = cell.neighborMines;
+                            text.setAttribute('fill', getNumberColor(cell.neighborMines));
+                        }
+                    } else if (cell.flagged) {
+                        text.textContent = '🚩';
+                        text.setAttribute('font-size', '14');
+                    }
+
+                    g.appendChild(rect);
+                    g.appendChild(text);
+
+                    // Left Click: Reveal
+                    g.addEventListener('mousedown', (e) => {
+                        if (e.button === 0) handleReveal(r, c);
+                    });
+                    // Right Click: Flag
+                    g.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        handleFlag(r, c);
+                    });
+
+                    cellsContainer.appendChild(g);
+                }
+            }
+        }
+
+        function getNumberColor(n) {
+            const colors = { 1: '#0000ff', 2: '#008000', 3: '#ff0000', 4: '#000', 5: '#800000', 6: '#008080', 7: '#000', 8: '#808080' };
+            return colors[n] || '#000';
+        }
+
+        function handleReveal(r, c) {
+            if (!gameActive || grid[r][c].flagged || grid[r][c].revealed) return;
+
+            grid[r][c].revealed = true;
+
+            if (grid[r][c].isMine) {
+                endGame(false);
+                return;
+            }
+
+            if (grid[r][c].neighborMines === 0) {
+                // Flood fill
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && !grid[nr][nc].revealed) {
+                            handleReveal(nr, nc);
+                        }
+                    }
+                }
+            }
+
+            checkWin();
+            drawBoard();
+        }
+
+        function handleFlag(r, c) {
+            if (!gameActive || grid[r][c].revealed) return;
+
+            grid[r][c].flagged = !grid[r][c].flagged;
+            minesFlagged += grid[r][c].flagged ? 1 : -1;
+            mineCountEl.textContent = MINE_TOTAL - minesFlagged;
+            drawBoard();
+        }
+
+        function checkWin() {
+            let unrevealedSafeCells = 0;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (!grid[r][c].isMine && !grid[r][c].revealed) unrevealedSafeCells++;
+                }
+            }
+            if (unrevealedSafeCells === 0) endGame(true);
+        }
+
+        function endGame(won) {
+            gameActive = false;
+            clearInterval(timerInterval);
+
+            // Reveal all mines
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (grid[r][c].isMine) grid[r][c].revealed = true;
+                }
+            }
+            drawBoard();
+
+            resultText.textContent = won ? "VICTORY!" : "GAME OVER!";
+            resultText.setAttribute('fill', won ? '#2ecc71' : '#e74c3c');
+            overlay.setAttribute('visibility', 'visible');
+        }
+
+        btnRestart.addEventListener('click', initGame);
+        overlay.addEventListener('click', initGame);
+
+        initGame();
+        ]]>
+    </script>
+</svg>

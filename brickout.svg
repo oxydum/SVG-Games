@@ -1,0 +1,264 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="600" viewBox="0 0 480 600" style="background: #1a1a2e; font-family: Arial, sans-serif;">
+    <!-- Background -->
+    <rect width="480" height="600" fill="#1a1a2e" />
+
+    <!-- Header & Stats -->
+    <text x="240" y="50" font-size="32" font-weight="bold" fill="#e94560" text-anchor="middle">BRICK OUT ULTRA</text>
+    <rect x="320" y="20" width="150" height="30" rx="15" fill="#16213e" />
+    <text x="395" y="41" font-size="16" fill="#fff" text-anchor="middle">Score: <tspan id="score">0</tspan> | Lvl: <tspan id="lvl">1</tspan></text>
+
+    <!-- Game Area -->
+    <g transform="translate(40, 70)">
+        <rect width="400" height="500" fill="#0f3460" stroke="#e94560" stroke-width="3" />
+        <g id="bricks-container"></g>
+        <g id="bonuses-container"></g>
+        <g id="fire-container"></g>
+        <rect id="paddle" x="160" y="480" width="80" height="15" rx="5" fill="#e94560" />
+        <circle id="ball" cx="200" cy="470" r="8" fill="#fff" />
+    </g>
+
+    <!-- Overlay -->
+    <g id="overlay" style="cursor:pointer">
+        <rect x="0" y="0" width="480" height="600" fill="rgba(0,0,0,0.8)" />
+        <rect x="140" y="260" width="200" height="80" rx="15" fill="#e94560" />
+        <text x="240" y="305" font-size="24" font-weight="bold" fill="white" text-anchor="middle" pointer-events="none">CLICK TO START</text>
+        <text x="240" y="335" font-size="14" fill="#ddd" text-anchor="middle" pointer-events="none">Mouse: Move | Space: Shoot/Launch</text>
+    </g>
+
+    <script type="text/javascript">
+        <![CDATA[
+        const ballEl = document.getElementById('ball');
+        const paddleEl = document.getElementById('paddle');
+        const bricksContainer = document.getElementById('bricks-container');
+        const bonusesContainer = document.getElementById('bonuses-container');
+        const fireContainer = document.getElementById('fire-container');
+        const scoreEl = document.getElementById('score');
+        const lvlEl = document.getElementById('lvl');
+        const overlay = document.getElementById('overlay');
+
+        let score = 0;
+        let level = 1;
+        let gameActive = false;
+        let ballX = 200, ballY = 470, ballVX = 3, ballVY = -3;
+        let paddleX = 160, paddleW = 80;
+        let bricks = [];
+        let activeBonuses = [];
+        let activeFires = [];
+
+        let isSticky = false;
+        let isFireActive = false;
+        let currentCrescendo = 1.0;
+
+        const BRICK_W = 60;
+        const BRICK_H = 20;
+        const BRICK_GAP = 4;
+
+        const BONUS_TYPES = [
+            { name: 'WIDE', color: '#00ff00', effect: () => { paddleW = 120; setTimeout(() => { paddleW = 80; }, 10000); } },
+            { name: 'SLOW', color: '#00ffff', effect: () => {
+                const factor = 0.6; ballVX *= factor; ballVY *= factor;
+                setTimeout(() => { ballVX /= factor; ballVY /= factor; }, 6000);
+            } },
+            { name: 'STICK', color: '#ff00ff', effect: () => { isSticky = true; } },
+            { name: 'FIRE', color: '#ffaa00', effect: () => { isFireActive = true; setTimeout(() => { isFireActive = false; }, 10000); } }
+        ];
+
+        function createBricks() {
+            bricksContainer.innerHTML = '';
+            bricks = [];
+            const rows = Math.min(5 + level, 8);
+            const cols = 6;
+            const colors = ['#ff4d4d', '#ffa500', '#ffff00', '#00ff00', '#00ffff', '#ff00ff', '#ffffff', '#aaaaaa'];
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const b = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    const x = c * (BRICK_W + BRICK_GAP) + 10;
+                    const y = r * (BRICK_H + BRICK_GAP) + 20;
+                    b.setAttribute('x', x);
+                    b.setAttribute('y', y);
+                    b.setAttribute('width', BRICK_W);
+                    b.setAttribute('height', BRICK_H);
+                    b.setAttribute('rx', '3');
+                    b.setAttribute('fill', colors[r % colors.length]);
+                    bricksContainer.appendChild(b);
+                    bricks.push({ x, y, w: BRICK_W, h: BRICK_H, el: b, active: true });
+                }
+            }
+        }
+
+        function spawnBonus(x, y) {
+            if (Math.random() > 0.25) return;
+            const type = BONUS_TYPES[Math.floor(Math.random() * BONUS_TYPES.length)];
+            const bEl = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            bEl.setAttribute('r', '6');
+            bEl.setAttribute('fill', type.color);
+            bonusesContainer.appendChild(bEl);
+            activeBonuses.push({ x, y, el: bEl, type });
+        }
+
+        function fireProjectile() {
+            if (!isFireActive) return;
+            const fEl = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            fEl.setAttribute('width', '4');
+            fEl.setAttribute('height', '10');
+            fEl.setAttribute('fill', '#ffaa00');
+            fireContainer.appendChild(fEl);
+            activeFires.push({ x: paddleX + paddleW/2, y: 480, el: fEl });
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // Ball movement (unless sticky and attached)
+            if (!(isSticky && ballY >= 465 && ballY <= 480 && ballX >= paddleX && ballX <= paddleX + paddleW)) {
+                ballX += ballVX * currentCrescendo;
+                ballY += ballVY * currentCrescendo;
+            } else {
+                // Stick the ball to the paddle
+                ballX = paddleX + paddleW / 2;
+                ballY = 470;
+            }
+
+            if (ballX <= 8 || ballX >= 392) ballVX *= -1;
+            if (ballY <= 8) ballVY *= -1;
+
+            if (ballY >= 465 && ballY <= 480 && ballX >= paddleX && ballX <= paddleX + paddleW) {
+                if (!isSticky) {
+                    ballVY *= -1;
+                    const hitPos = (ballX - (paddleX + paddleW / 2)) / (paddleW / 2);
+                    ballVX += hitPos * 2;
+                }
+            }
+
+            bricks.forEach(b => {
+                if (b.active && ballX >= b.x && ballX <= b.x + b.w && ballY >= b.y && ballY <= b.y + b.h) {
+                    b.active = false;
+                    b.el.setAttribute('visibility', 'hidden');
+                    ballVY *= -1;
+                    score += 10;
+                    scoreEl.textContent = score;
+                    spawnBonus(b.x + b.w/2, b.y + b.h/2);
+                    // DIFFICULTY CRESCENDO: ball speeds up slightly with every brick
+                    currentCrescendo += 0.005;
+                }
+            });
+
+            // Update Bonuses
+            for (let i = activeBonuses.length - 1; i >= 0; i--) {
+                const b = activeBonuses[i];
+                b.y += 3;
+                b.el.setAttribute('cx', b.x);
+                b.el.setAttribute('cy', b.y);
+                if (b.y >= 465 && b.y <= 480 && b.x >= paddleX && b.x <= paddleX + paddleW) {
+                    b.type.effect();
+                    b.el.remove();
+                    activeBonuses.splice(i, 1);
+                    if (b.type.name === 'STICK') isSticky = false; // Consume sticky on use
+                } else if (b.y > 500) {
+                    b.el.remove();
+                    activeBonuses.splice(i, 1);
+                }
+            }
+
+            // Update Fireballs
+            for (let i = activeFires.length - 1; i >= 0; i--) {
+                const f = activeFires[i];
+                f.y -= 8;
+                f.el.setAttribute('x', f.x);
+                f.el.setAttribute('y', f.y);
+
+                bricks.forEach(b => {
+                    if (b.active && f.x >= b.x && f.x <= b.x + b.w && f.y >= b.y && f.y <= b.y + b.h) {
+                        b.active = false;
+                        b.el.setAttribute('visibility', 'hidden');
+                        score += 5;
+                        scoreEl.textContent = score;
+                        spawnBonus(b.x + b.w/2, b.y + b.h/2);
+                        f.el.remove();
+                        activeFires.splice(i, 1);
+                    }
+                });
+
+                if (f && f.y < 0) {
+                    f.el.remove();
+                    activeFires.splice(i, 1);
+                }
+            }
+
+            if (ballY > 500) {
+                gameActive = false;
+                overlay.setAttribute('visibility', 'visible');
+                overlay.querySelector('text').textContent = "GAME OVER!";
+            }
+
+            if (bricks.every(b => !b.active)) {
+                level++;
+                lvlEl.textContent = level;
+                currentCrescendo = 1.0; // reset crescendo for new level
+                createBricks();
+                resetBall();
+            }
+
+            ballEl.setAttribute('cx', ballX);
+            ballEl.setAttribute('cy', ballY);
+            paddleEl.setAttribute('x', paddleX);
+            paddleEl.setAttribute('width', paddleW);
+
+            requestAnimationFrame(update);
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            const svg = document.querySelector('svg');
+            const rect = svg.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            paddleX = mouseX - 40 - paddleW / 2;
+            if (paddleX < 0) paddleX = 0;
+            if (paddleX > 400 - paddleW) paddleX = 400 - paddleW;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (gameActive) {
+                    if (isSticky && ballY >= 465) {
+                        // Launch ball from stick
+                        isSticky = false;
+                        ballVY = -3 * (1 + (level-1)*0.2);
+                        ballVX = (Math.random() - 0.5) * 4;
+                    } else {
+                        fireProjectile();
+                    }
+                }
+            }
+        });
+
+        overlay.addEventListener('click', () => {
+            gameActive = true;
+            score = 0;
+            level = 1;
+            currentCrescendo = 1.0;
+            scoreEl.textContent = '0';
+            lvlEl.textContent = '1';
+            overlay.setAttribute('visibility', 'hidden');
+            bonusesContainer.innerHTML = '';
+            fireContainer.innerHTML = '';
+            activeBonuses = [];
+            activeFires = [];
+            isSticky = false;
+            isFireActive = false;
+            createBricks();
+            resetBall();
+            update();
+        });
+
+        function resetBall() {
+            ballX = 200; ballY = 470;
+            ballVX = (3 * (1 + (level-1)*0.2)) * (Math.random() > 0.5 ? 1 : -1);
+            ballVY = -3 * (1 + (level-1)*0.2);
+        }
+
+        createBricks();
+        ]]>
+    </script>
+</svg>

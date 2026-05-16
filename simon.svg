@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="600" viewBox="0 0 500 600" style="background: #2c3e50; font-family: 'Segoe UI', Arial, sans-serif;">
+    <!-- Background -->
+    <rect width="500" height="600" fill="#2c3e50" />
+
+    <!-- Title and Score -->
+    <text x="250" y="60" font-size="32" font-weight="bold" fill="#ecf0f1" text-anchor="middle">SIMON SVG</text>
+    <text x="250" y="100" font-size="24" fill="#f1c40f" text-anchor="middle">Score: <tspan id="score">0</tspan></text>
+
+    <!-- Define Clips for the Board -->
+    <defs>
+        <clipPath id="clip-tr"><rect x="0" y="-150" width="150" height="150" /></clipPath>
+        <clipPath id="clip-tl"><rect x="-150" y="-150" width="150" height="150" /></clipPath>
+        <clipPath id="clip-br"><rect x="0" y="0" width="150" height="150" /></clipPath>
+        <clipPath id="clip-bl"><rect x="-150" y="0" width="150" height="150" /></clipPath>
+    </defs>
+
+    <!-- Simon Game Board -->
+    <g transform="translate(250, 300)">
+        <!-- Green Quadrant (Top Right) -->
+        <g id="q-green" style="cursor:pointer">
+            <circle cx="0" cy="0" r="150" fill="#2ecc71" stroke="#27ae60" stroke-width="4" clip-path="url(#clip-tr)" />
+            <circle cx="0" cy="0" r="150" fill="#a2fca2" opacity="0" clip-path="url(#clip-tr)" class="light" />
+        </g>
+        <!-- Red Quadrant (Top Left) -->
+        <g id="q-red" style="cursor:pointer">
+            <circle cx="0" cy="0" r="150" fill="#e74c3c" stroke="#c0392b" stroke-width="4" clip-path="url(#clip-tl)" />
+            <circle cx="0" cy="0" r="150" fill="#ff8d8d" opacity="0" clip-path="url(#clip-tl)" class="light" />
+        </g>
+        <!-- Yellow Quadrant (Bottom Right) -->
+        <g id="q-yellow" style="cursor:pointer">
+            <circle cx="0" cy="0" r="150" fill="#f1c40f" stroke="#d4ac0d" stroke-width="4" clip-path="url(#clip-br)" />
+            <circle cx="0" cy="0" r="150" fill="#fff38d" opacity="0" clip-path="url(#clip-br)" class="light" />
+        </g>
+        <!-- Blue Quadrant (Bottom Left) -->
+        <g id="q-blue" style="cursor:pointer">
+            <circle cx="0" cy="0" r="150" fill="#3498db" stroke="#2980b9" stroke-width="4" clip-path="url(#clip-bl)" />
+            <circle cx="0" cy="0" r="150" fill="#8db8ff" opacity="0" clip-path="url(#clip-bl)" class="light" />
+        </g>
+
+        <!-- Center Button -->
+        <g id="start-btn" style="cursor:pointer">
+            <circle cx="0" cy="0" r="40" fill="#34495e" stroke="#fff" stroke-width="3" />
+            <text x="0" y="5" font-size="14" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="central" pointer-events="none">START</text>
+        </g>
+    </g>
+
+    <!-- Game Over Overlay -->
+    <g id="overlay" visibility="hidden" style="cursor:pointer">
+        <rect x="0" y="0" width="500" height="600" fill="rgba(0,0,0,0.8)" />
+        <rect x="150" y="250" width="200" height="120" rx="15" fill="white" />
+        <text x="250" y="300" font-size="24" font-weight="bold" fill="#333" text-anchor="middle">GAME OVER!</text>
+        <text x="250" y="340" font-size="16" fill="#666" text-anchor="middle">Click to Play Again</text>
+    </g>
+
+    <script type="text/javascript">
+        <![CDATA[
+        const scoreEl = document.getElementById('score');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        const colors = {
+            green: { el: document.getElementById('q-green'), freq: 261.63, id: 'green' },
+            red: { el: document.getElementById('q-red'), freq: 329.63, id: 'red' },
+            yellow: { el: document.getElementById('q-yellow'), freq: 392.00, id: 'yellow' },
+            blue: { el: document.getElementById('q-blue'), freq: 493.88, id: 'blue' }
+        };
+
+        let sequence = [];
+        let userSequence = [];
+        let score = 0;
+        let isPlayingSequence = false;
+        let gameActive = false;
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTone(freq) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+        }
+
+        function lightUp(colorId) {
+            const target = colors[colorId].el;
+            const light = target.querySelector('.light');
+            light.setAttribute('opacity', '1');
+            playTone(colors[colorId].freq);
+            setTimeout(() => light.setAttribute('opacity', '0'), 300);
+        }
+
+        async function playSequence() {
+            isPlayingSequence = true;
+            for (const color of sequence) {
+                await new Promise(resolve => {
+                    lightUp(color);
+                    setTimeout(resolve, 600);
+                });
+            }
+            isPlayingSequence = false;
+        }
+
+        function nextLevel() {
+            userSequence = [];
+            const allColors = ['green', 'red', 'yellow', 'blue'];
+            sequence.push(allColors[Math.floor(Math.random() * 4)]);
+            score++;
+            scoreEl.textContent = score;
+            playSequence();
+        }
+
+        function handleInput(colorId) {
+            if (!gameActive || isPlayingSequence) return;
+
+            lightUp(colorId);
+            userSequence.push(colorId);
+
+            const currentStep = userSequence.length - 1;
+            if (userSequence[currentStep] !== sequence[currentStep]) {
+                gameOver();
+                return;
+            }
+
+            if (userSequence.length === sequence.length) {
+                setTimeout(nextLevel, 1000);
+            }
+        }
+
+        function gameOver() {
+            gameActive = false;
+            overlay.setAttribute('visibility', 'visible');
+        }
+
+        function start() {
+            audioCtx.resume();
+            score = 0;
+            sequence = [];
+            userSequence = [];
+            scoreEl.textContent = '0';
+            gameActive = true;
+            overlay.setAttribute('visibility', 'hidden');
+            nextLevel();
+        }
+
+        Object.keys(colors).forEach(colorId => {
+            colors[colorId].el.addEventListener('click', () => handleInput(colorId));
+        });
+
+        startBtn.addEventListener('click', start);
+        overlay.addEventListener('click', start);
+        ]]>
+    </script>
+</svg>
