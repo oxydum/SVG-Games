@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%" style="background-color: #2c3e50; user-select: none; -webkit-user-select: none;" ondragstart="return false">
+
+    <!-- Interface Utilisateur -->
+    <g id="ui" font-family="Arial, sans-serif" font-weight="bold">
+        <text x="400" y="40" fill="#ECF0F1" text-anchor="middle" font-size="24">RubikZCube</text>
+        <text id="algoText" x="400" y="535" fill="#F1C40F" text-anchor="middle" font-size="16" font-family="monospace"></text>
+        <text x="400" y="565" fill="#95A5A6" text-anchor="middle" font-size="14">Glissez sur le cube pour tourner | Glissez sur le fond pour tourner la vue</text>
+
+        <!-- Boutons d'action -->
+        <g transform="translate(300, 570)">
+            <rect width="70" height="30" rx="5" fill="#E67E22" onclick="scramble()" cursor="pointer"/>
+            <text x="35" y="20" fill="#FFF" text-anchor="middle" pointer-events="none" font-size="12">Mélanger</text>
+
+            <rect x="80" width="50" height="30" rx="5" fill="#3498DB" onclick="resetCube()" cursor="pointer"/>
+            <text x="105" y="20" fill="#FFF" text-anchor="middle" pointer-events="none" font-size="12">Reset</text>
+
+            <rect x="140" width="80" height="30" rx="5" fill="#27AE60" onclick="solve()" cursor="pointer"/>
+            <text x="180" y="20" fill="#FFF" text-anchor="middle" pointer-events="none" font-size="12">Résoudre</text>
+        </g>
+    </g>
+
+    <!-- Groupe contenant le cube 3D -->
+    <g id="cubeGroup" transform="translate(400, 280)"></g>
+
+    <script type="text/ecmascript"><![CDATA[
+        var ns = "http://www.w3.org/2000/svg";
+        var cubeGroup = document.getElementById("cubeGroup");
+        var svgRoot = document.querySelector("svg");
+
+        var cubies = [];
+        var moveHistory = [];
+        var autoQueue = [];
+        var isAutoPlaying = false;
+
+        var rotX = -30;
+        var rotY = 45;
+        var scale = 70;
+
+        var dragState = { active: false, type: '', startMouse: {x:0, y:0}, currentMouse: {x:0, y:0}, cubie: null, face: null, axis: '', layer: 0, dir: 0, angle: 0, DragDir3D: null };
+        var activeDrag = { active: false, axis: '', layer: 0, dir: 0, angle: 0 };
+        var snapAnimation = null;
+
+        var colors = { U: "#FFFFFF", D: "#FFFF00", F: "#009E60", B: "#0051BA", R: "#FF5800", L: "#C41E3A" };
+
+        var notationMap = {
+        'Y_1':  { base: 'U', sDir: 1 },   'Y_-1': { base: 'D', sDir: -1 },
+        'X_1':  { base: 'R', sDir: 1 },    'X_-1': { base: 'L', sDir: -1 },
+        'Z_1':  { base: 'F', sDir: 1 },    'Z_-1': { base: 'B', sDir: -1 },
+        'X_0':  { base: 'M', sDir: -1 },   'Y_0':  { base: 'E', sDir: -1 }, 'Z_0':  { base: 'S', sDir: 1 }
+        };
+
+        var solveNotationArr = [];
+        var solveStepIndex = -1;
+
+        // --- OUTILS MATH 3D ---
+        function identityMatrix() { return [[1,0,0],[0,1,0],[0,0,1]]; }
+        function matMul(A, B) { var C=[[0,0,0],[0,0,0],[0,0,0]]; for(var i=0;i<3;i++) for(var j=0;j<3;j++) for(var k=0;k<3;k++) C[i][j]+=A[i][k]*B[k][j]; return C; }
+                    function matVecMul(M, V) { return { x: M[0][0]*V.x+M[0][1]*V.y+M[0][2]*V.z, y: M[1][0]*V.x+M[1][1]*V.y+M[1][2]*V.z, z: M[2][0]*V.x+M[2][1]*V.y+M[2][2]*V.z }; }
+                    function rotMatX(dir) { var a=dir*Math.PI/2; return [[1,0,0],[0,Math.cos(a),-Math.sin(a)],[0,Math.sin(a),Math.cos(a)]]; }
+                    function rotMatY(dir) { var a=dir*Math.PI/2; return [[Math.cos(a),0,Math.sin(a)],[0,1,0],[-Math.sin(a),0,Math.cos(a)]]; }
+                    function rotMatZ(dir) { var a=dir*Math.PI/2; return [[Math.cos(a),-Math.sin(a),0],[Math.sin(a),Math.cos(a),0],[0,0,1]]; }
+                    function getRotMat(axis, dir) { if(axis==='X') return rotMatX(dir); if(axis==='Y') return rotMatY(dir); return rotMatZ(dir); }
+                    function getAxisName(V) { if(Math.abs(V.x)>0.5) return 'X'; if(Math.abs(V.y)>0.5) return 'Y'; return 'Z'; }
+                    function crossProduct(A, B) { return {x: A.y*B.z-A.z*B.y, y: A.z*B.x-A.x*B.z, z: A.x*B.y-A.y*B.x}; }
+                    function dotProduct3D(A, B) { return A.x*B.x + A.y*B.y + A.z*B.z; }
+                    function vecLen(V) { return Math.sqrt(V.x*V.x + V.y*V.y); }
+
+                    function projectPoint(p) {
+                    var p1 = matVecMul(rotMatX(rotX/180*Math.PI), p);
+                    var p2 = matVecMul(rotMatY(rotY/180*Math.PI), p1);
+                    return { x: p2.x*scale, y: -p2.y*scale, z: p2.z };
+                    }
+
+                    // --- GENERATION DU CUBE ---
+                    function createPoly(pts, fill, sw, cubie, face, isSticker) {
+                    var poly = document.createElementNS(ns, "polygon");
+                    poly.setAttribute("fill", fill); poly.setAttribute("stroke", "#000000"); poly.setAttribute("stroke-width", sw); poly.setAttribute("stroke-linejoin", "bevel");
+                    if(isSticker) poly.style.cursor = "grab";
+                    var polyObj = { elem:poly, localPts:pts, cubie:cubie, face:face, isSticker:isSticker||false };
+                    poly.addEventListener("mousedown", function(e) {
+                    if(isAutoPlaying || dragState.active) return;
+                    e.preventDefault(); e.stopPropagation();
+                    dragState.active = true; dragState.type = 'FACE'; dragState.startMouse = {x: e.clientX, y: e.clientY}; dragState.currentMouse = {x: e.clientX, y: e.clientY};
+                    dragState.cubie = cubie; dragState.face = face; dragState.axis = ''; dragState.angle = 0;
+                    document.body.style.cursor = "grabbing";
+                    solveNotationArr = []; solveStepIndex = -1; document.getElementById("algoText").textContent = "";
+                    });
+                    return polyObj;
+                    }
+
+                    function initCube() {
+                    cubies = []; moveHistory = [];
+                    while(cubeGroup.firstChild) cubeGroup.removeChild(cubeGroup.firstChild);
+                    var s=0.45, st=0.38, d=0.01;
+                    for(var cx=-1; cx<=1; cx++) for(var cy=-1; cy<=1; cy++) for(var cz=-1; cz<=1; cz++) {
+                                var cubie = { cx:cx, cy:cy, cz:cz, transform:identityMatrix(), polys:[] };
+                                var bf = [
+                                {pts:[{x:-s,y:-s,z:s},{x:s,y:-s,z:s},{x:s,y:s,z:s},{x:-s,y:s,z:s}], f:'F'}, {pts:[{x:s,y:-s,z:-s},{x:-s,y:-s,z:-s},{x:-s,y:s,z:-s},{x:s,y:s,z:-s}], f:'B'},
+                                {pts:[{x:s,y:-s,z:s},{x:s,y:-s,z:-s},{x:s,y:s,z:-s},{x:s,y:s,z:s}], f:'R'}, {pts:[{x:-s,y:-s,z:-s},{x:-s,y:-s,z:s},{x:-s,y:s,z:s},{x:-s,y:s,z:-s}], f:'L'},
+                                {pts:[{x:-s,y:s,z:s},{x:s,y:s,z:s},{x:s,y:s,z:-s},{x:-s,y:s,z:-s}], f:'U'}, {pts:[{x:-s,y:-s,z:-s},{x:s,y:-s,z:-s},{x:s,y:-s,z:s},{x:-s,y:-s,z:s}], f:'D'}
+                                ];
+                                for(var i=0;i<bf.length;i++) cubie.polys.push(createPoly(bf[i].pts, "#111111", 1.5, cubie, bf[i].f, false));
+                                    if(cz===1) cubie.polys.push(createPoly([{x:-st,y:-st,z:s+d},{x:st,y:-st,z:s+d},{x:st,y:st,z:s+d},{x:-st,y:st,z:s+d}], colors.F, 0.5, cubie, 'F', true));
+                                    if(cz===-1) cubie.polys.push(createPoly([{x:st,y:-st,z:-s-d},{x:-st,y:-st,z:-s-d},{x:-st,y:st,z:-s-d},{x:st,y:st,z:-s-d}], colors.B, 0.5, cubie, 'B', true));
+                                    if(cx===1) cubie.polys.push(createPoly([{x:s+d,y:-st,z:st},{x:s+d,y:-st,z:-st},{x:s+d,y:st,z:-st},{x:s+d,y:st,z:st}], colors.R, 0.5, cubie, 'R', true));
+                                    if(cx===-1) cubie.polys.push(createPoly([{x:-s-d,y:-st,z:-st},{x:-s-d,y:-st,z:st},{x:-s-d,y:st,z:st},{x:-s-d,y:st,z:-st}], colors.L, 0.5, cubie, 'L', true));
+                                    if(cy===1) cubie.polys.push(createPoly([{x:-st,y:s+d,z:st},{x:st,y:s+d,z:st},{x:st,y:s+d,z:-st},{x:-st,y:s+d,z:-st}], colors.U, 0.5, cubie, 'U', true));
+                                    if(cy===-1) cubie.polys.push(createPoly([{x:-st,y:-s-d,z:-st},{x:st,y:-s-d,z:-st},{x:st,y:-s-d,z:st},{x:-st,y:-s-d,z:st}], colors.D, 0.5, cubie, 'D', true));
+                                    for(var i=0;i<cubie.polys.length;i++) cubeGroup.appendChild(cubie.polys[i].elem);
+                                        cubies.push(cubie);
+                                        }
+                                        render();
+                                        }
+
+                                        // --- RENDU ---
+                                        function render() {
+                                        var renderList = [];
+                                        for(var i=0; i<cubies.length; i++) {
+                                            var c = cubies[i]; var isMoving = activeDrag.active && isAffected(c, activeDrag.axis, activeDrag.layer);
+                                            for(var j=0; j<c.polys.length; j++) {
+                                                var poly = c.polys[j]; var projPts = [], zSum = 0;
+                                                for(var k=0; k<poly.localPts.length; k++) {
+                                                    var p = matVecMul(c.transform, poly.localPts[k]); p.x+=c.cx; p.y+=c.cy; p.z+=c.cz;
+                                                    // CORRECTION BUG ANIMATION : activeDrag.angle/90 suffit, pas besoin de multiplier par dir
+                                                    if(isMoving) p = matVecMul(getRotMat(activeDrag.axis, activeDrag.angle/90), p);
+                                                    var proj = projectPoint(p); projPts.push(proj); zSum+=proj.z;
+                                                    }
+                                                    var Ax=projPts[1].x-projPts[0].x, Ay=projPts[1].y-projPts[0].y, Bx=projPts[2].x-projPts[0].x, By=projPts[2].y-projPts[0].y;
+                                                    if (Ax*By-Ay*Bx > 0.1) { poly.elem.setAttribute("visibility", "hidden"); continue; }
+                                                    poly.elem.setAttribute("visibility", "visible"); renderList.push({ poly:poly, z:(zSum/4)+(poly.isSticker?0.5:0), projPts:projPts });
+                                                    }
+                                                    }
+                                                    renderList.sort((a,b)=>a.z-b.z);
+                                                    for(var i=0;i<renderList.length;i++) { var item=renderList[i]; item.poly.elem.setAttribute("points", item.projPts.map(p=>p.x+","+p.y).join(" ")); cubeGroup.appendChild(item.poly.elem); }
+                                                        }
+
+                                                        function isAffected(c, axis, layer) { return (axis==='X'&&c.cx===layer) || (axis==='Y'&&c.cy===layer) || (axis==='Z'&&c.cz===layer); }
+
+                                                        function applyRotation(axis, layer, dir) {
+                                                        for(var i=0; i<cubies.length; i++) {
+                                                            var c = cubies[i]; if(isAffected(c, axis, layer)) {
+                                                            if(axis==='X') { var y=c.cy, z=c.cz; if(dir>0){c.cy=-z;c.cz=y;}else{c.cy=z;c.cz=-y;} }
+                                                            if(axis==='Y') { var x=c.cx, z=c.cz; if(dir>0){c.cx=z;c.cz=-x;}else{c.cx=-z;c.cz=x;} }
+                                                            if(axis==='Z') { var x=c.cx, y=c.cy; if(dir>0){c.cx=-y;c.cy=x;}else{c.cx=y;c.cy=-x;} }
+                                                            c.transform = matMul(getRotMat(axis, dir), c.transform);
+                                                            }
+                                                            }
+                                                            }
+
+                                                            function getFaceVectors(face) {
+                                                            var N = {x:0,y:0,z:0}, A1 = {x:0,y:0,z:0}, A2 = {x:0,y:0,z:0};
+                                                            if(face==='U') { N.y=1; A1.x=1; A2.z=1; } else if(face==='D') { N.y=-1; A1.x=1; A2.z=-1; }
+                                                            else if(face==='R') { N.x=1; A1.z=-1; A2.y=1; } else if(face==='L') { N.x=-1; A1.z=1; A2.y=1; }
+                                                            else if(face==='F') { N.z=1; A1.x=1; A2.y=1; } else if(face==='B') { N.z=-1; A1.x=-1; A2.y=1; }
+                                                            return {N:N, A1:A1, A2:A2};
+                                                            }
+
+                                                            function processFaceDrag() {
+                                                            var rect = svgRoot.getBoundingClientRect(); var svgScale = (rect.width > 0) ? (800 / rect.width) : 1;
+                                                            var dx = (dragState.currentMouse.x - dragState.startMouse.x) * svgScale; var dy = (dragState.currentMouse.y - dragState.startMouse.y) * svgScale;
+                                                            if (!dragState.axis) {
+                                                            var dist = Math.sqrt(dx*dx + dy*dy); if (dist < 10) return;
+                                                                var vectors = getFaceVectors(dragState.face); var C = {x:dragState.cubie.cx, y:dragState.cubie.cy, z:dragState.cubie.cz}; var C2D = projectPoint(C);
+                                                                var A1_3D = {x:C.x+vectors.A1.x, y:C.y+vectors.A1.y, z:C.z+vectors.A1.z}; var A2_3D = {x:C.x+vectors.A2.x, y:C.y+vectors.A2.y, z:C.z+vectors.A2.z};
+                                                                var A1_2D = {x: projectPoint(A1_3D).x - C2D.x, y: projectPoint(A1_3D).y - C2D.y}; var A2_2D = {x: projectPoint(A2_3D).x - C2D.x, y: projectPoint(A2_3D).y - C2D.y};
+                                                                var len1 = vecLen(A1_2D)||1; var len2 = vecLen(A2_2D)||1;
+                                                                var dot1 = dx*(A1_2D.x/len1) + dy*(A1_2D.y/len1); var dot2 = dx*(A2_2D.x/len2) + dy*(A2_2D.y/len2);
+
+                                                                if (Math.abs(dot1) < 5 && Math.abs(dot2) < 5) { dragState.type = 'CAMERA'; dragState.startMouse = {x: dragState.currentMouse.x, y: dragState.currentMouse.y}; document.body.style.cursor = "move"; return; }
+
+                                                                        // CORRECTION BUG AXE : L'axe de rotation est TOUJOURS la normale de la face cliquée !
+                                                                        var RotAxis3D = vectors.N;
+                                                                        var dir;
+                                                                        if(Math.abs(dot1) > Math.abs(dot2)) {
+                                                                        dir = Math.sign(dot1);
+                                                                        dragState.DragDir3D = {x: vectors.A1.x * dir, y: vectors.A1.y * dir, z: vectors.A1.z * dir};
+                                                                        } else {
+                                                                        dir = -Math.sign(dot2); // Sens de rotation inverse si on glisse sur l'axe secondaire
+                                                                        dragState.DragDir3D = {x: vectors.A2.x * Math.sign(dot2), y: vectors.A2.y * Math.sign(dot2), z: vectors.A2.z * Math.sign(dot2)};
+                                                                        }
+                                                                        if(dir === 0) dir = 1;
+
+                                                                        var layer; if(Math.abs(RotAxis3D.x)>0.5) layer = dragState.cubie.cx; else if(Math.abs(RotAxis3D.y)>0.5) layer = dragState.cubie.cy; else layer = dragState.cubie.cz;
+                                                                        dragState.axis = getAxisName(RotAxis3D); dragState.layer = layer; dragState.dir = dir;
+                                                                        }
+                                                                        if (dragState.axis) {
+                                                                        var C2 = {x:dragState.cubie.cx, y:dragState.cubie.cy, z:dragState.cubie.cz}; var C2D2 = projectPoint(C2);
+                                                                        var D3D_1 = {x:C2.x+dragState.DragDir3D.x, y:C2.y+dragState.DragDir3D.y, z:C2.z+dragState.DragDir3D.z};
+                                                                        var D2D_1 = {x: projectPoint(D3D_1).x - C2D2.x, y: projectPoint(D3D_1).y - C2D2.y};
+                                                                        var len2D = vecLen(D2D_1); if(len2D < 0.1) len2D = 0.1;
+                                                                            dragState.angle = ((dx*D2D_1.x + dy*D2D_1.y) / (len2D * len2D)) * 90;
+                                                                            activeDrag = { active:true, axis: dragState.axis, layer: dragState.layer, dir: dragState.dir, angle: dragState.angle };
+                                                                            render();
+                                                                            }
+                                                                            }
+
+                                                                            function finishFaceDrag() {
+                                                                            if (!dragState.axis) return;
+                                                                            var targetAngle = Math.round(dragState.angle / 90) * 90;
+                                                                            if(targetAngle !== 0) {
+                                                                            var numTurns = targetAngle / 90;
+                                                                            if(numTurns === 3) numTurns = -1;
+                                                                            if(numTurns === -3) numTurns = 1;
+                                                                            var actualDir = Math.sign(numTurns);
+                                                                            var totalAngle = actualDir * Math.abs(numTurns) * 90;
+                                                                            startSnapAnimation(dragState.axis, dragState.layer, actualDir, dragState.angle, totalAngle, Math.abs(numTurns));
+                                                                            moveHistory.push({axis: dragState.axis, layer: dragState.layer, dir: numTurns});
+                                                                            } else { startSnapAnimation(dragState.axis, dragState.layer, dragState.dir, dragState.angle, 0, 0); }
+                                                                            }
+
+                                                                            svgRoot.addEventListener("mousedown", function(e) {
+                                                                            if(dragState.active || isAutoPlaying) return; e.preventDefault();
+                                                                            dragState.active = true; dragState.type = 'CAMERA'; dragState.startMouse = {x: e.clientX, y: e.clientY}; dragState.currentMouse = {x: e.clientX, y: e.clientY};
+                                                                            document.body.style.cursor = "move"; solveNotationArr = []; solveStepIndex = -1; document.getElementById("algoText").textContent = "";
+                                                                            });
+
+                                                                            document.addEventListener("mousemove", function(e) {
+                                                                            if (!dragState.active) return; e.preventDefault(); dragState.currentMouse = {x: e.clientX, y: e.clientY};
+                                                                            if (dragState.type === 'CAMERA') { rotY += (e.clientX - dragState.startMouse.x) * 0.3; rotX -= (e.clientY - dragState.startMouse.y) * 0.3; dragState.startMouse = {x: e.clientX, y: e.clientY}; if(!isAutoPlaying) render(); }
+                                                                            else if (dragState.type === 'FACE') { processFaceDrag(); }
+                                                                            });
+
+                                                                            document.addEventListener("mouseup", function(e) {
+                                                                            if (!dragState.active) return; if (dragState.type === 'FACE') { finishFaceDrag(); }
+                                                                            dragState.active = false; dragState.type = ''; document.body.style.cursor = "default";
+                                                                            });
+
+                                                                            // --- ANIMATION DE SNAP & AUTOPLAY ---
+                                                                            function startSnapAnimation(axis, layer, dir, startAng, targetAng, turns) {
+                                                                            snapAnimation = {axis:axis, layer:layer, dir:dir, startAngle:startAng, targetAngle:targetAng, turns:turns, startTime:performance.now(), duration: 100 + 50*turns};
+                                                                            requestAnimationFrame(animateSnap);
+                                                                            }
+
+                                                                            function animateSnap(time) {
+                                                                            if(!snapAnimation) return;
+                                                                            var t = Math.min((time - snapAnimation.startTime) / snapAnimation.duration, 1); t = t * (2 - t);
+                                                                            activeDrag.angle = snapAnimation.startAngle + (snapAnimation.targetAngle - snapAnimation.startAngle) * t;
+                                                                            activeDrag.axis = snapAnimation.axis; activeDrag.layer = snapAnimation.layer; activeDrag.dir = snapAnimation.dir; activeDrag.active = true;
+                                                                            render();
+                                                                            if(t < 1) { requestAnimationFrame(animateSnap); } else {
+                                                                                if(snapAnimation.turns > 0) { for(var i=0; i<snapAnimation.turns; i++) applyRotation(snapAnimation.axis, snapAnimation.layer, snapAnimation.dir); }
+                                                                                    activeDrag.active = false; snapAnimation = null; render(); if(isAutoPlaying) processAutoQueue();
+                                                                                    }
+                                                                                    }
+
+                                                                                    // --- LOGIQUE DE RESOLUTION ---
+                                                                                    function computeSolveSequence() {
+                                                                                    var raw = [];
+                                                                                    for(var i=0; i<moveHistory.length; i++) { var m = moveHistory[i]; raw.push({axis: m.axis, layer: m.layer, dir: -m.dir}); }
+                                                                                        raw.reverse();
+                                                                                        var changed = true;
+                                                                                        while(changed) {
+                                                                                        changed = false; var next = []; var i = 0;
+                                                                                        while(i < raw.length) {
+                                                                                            if(i < raw.length - 1 && raw[i].axis === raw[i+1].axis && raw[i].layer === raw[i+1].layer) {
+                                                                                                var sum = raw[i].dir + raw[i+1].dir;
+                                                                                                if(sum === 0 || Math.abs(sum) === 4) { i += 2; changed = true; }
+                                                                                                else if(Math.abs(sum) === 3) { next.push({axis: raw[i].axis, layer: raw[i].layer, dir: sum > 0 ? -1 : 1}); i += 2; changed = true; }
+                                                                                                else { next.push({axis: raw[i].axis, layer: raw[i].layer, dir: sum}); i += 2; changed = true; }
+                                                                                                } else { next.push(raw[i]); i++; }
+                                                                                                }
+                                                                                                raw = next;
+                                                                                                }
+                                                                                                return raw;
+                                                                                                }
+
+                                                                                                function formatNotation(sequence) {
+                                                                                                var arr = [];
+                                                                                                for(var i=0; i<sequence.length; i++) {
+                                                                                                    var m = sequence[i]; var key = m.axis + '_' + m.layer; var info = notationMap[key]; if(!info) continue;
+                                                                                                    var isPrime = (m.dir === -info.sDir); var isDouble = (Math.abs(m.dir) === 2);
+                                                                                                    var str = info.base; if(isDouble) str += "2"; else if(isPrime) str += "'";
+                                                                                                    arr.push(str);
+                                                                                                    }
+                                                                                                    return arr;
+                                                                                                    }
+
+                                                                                                    function updateAlgoText() {
+                                                                                                    if(solveNotationArr.length === 0) return;
+                                                                                                    var str = "";
+                                                                                                    for(var i=0; i<solveNotationArr.length; i++) {
+                                                                                                        if(i > 0) str += " ";
+                                                                                                        if(i === solveStepIndex) str += "[" + solveNotationArr[i] + "]";
+                                                                                                        else str += solveNotationArr[i];
+                                                                                                        }
+                                                                                                        document.getElementById("algoText").textContent = "Solution : " + str;
+                                                                                                        }
+
+                                                                                                        function scramble() {
+                                                                                                        if(isAutoPlaying || dragState.active) return;
+                                                                                                        moveHistory = []; autoQueue = []; var axes = ['X', 'Y', 'Z'];
+                                                                                                        for(var i=0; i<20; i++) { var m = {axis: axes[Math.floor(Math.random()*3)], layer: Math.floor(Math.random()*3)-1, dir: Math.random() < 0.5 ? 1 : -1}; moveHistory.push(m); autoQueue.push(m); }
+                                                                                                                isAutoPlaying = true; solveNotationArr = []; document.getElementById("algoText").textContent = "Mélange en cours..."; processAutoQueue();
+                                                                                                                }
+
+                                                                                                                function solve() {
+                                                                                                                if(isAutoPlaying || dragState.active) return;
+                                                                                                                var solveSeq = computeSolveSequence();
+                                                                                                                if(solveSeq.length === 0) { document.getElementById("algoText").textContent = "Le cube est déjà résolu !"; return; }
+                                                                                                                solveNotationArr = formatNotation(solveSeq);
+                                                                                                                solveStepIndex = -1;
+                                                                                                                autoQueue = solveSeq; moveHistory = []; isAutoPlaying = true; updateAlgoText(); processAutoQueue();
+                                                                                                                }
+
+                                                                                                                function resetCube() {
+                                                                                                                if(isAutoPlaying || dragState.active) return;
+                                                                                                                moveHistory = []; autoQueue = []; isAutoPlaying = false; activeDrag.active = false; snapAnimation = null;
+                                                                                                                initCube();
+                                                                                                                document.getElementById("algoText").textContent = "Cube réinitialisé !";
+                                                                                                                }
+
+                                                                                                                function processAutoQueue() {
+                                                                                                                if(autoQueue.length === 0) { isAutoPlaying = false; solveStepIndex = -1; if(solveNotationArr.length > 0) document.getElementById("algoText").textContent = "Résolu !"; return; }
+                                                                                                                var move = autoQueue.shift();
+                                                                                                                if(solveNotationArr.length > 0) { solveStepIndex++; updateAlgoText(); }
+                                                                                                                var dirSign = Math.sign(move.dir); var numTurns = Math.abs(move.dir);
+                                                                                                                activeDrag = { active:true, axis:move.axis, layer:move.layer, dir:dirSign, angle:0 };
+                                                                                                                startSnapAnimation(move.axis, move.layer, dirSign, 0, dirSign * 90 * numTurns, numTurns);
+                                                                                                                }
+
+                                                                                                                initCube();
+                                                                                                                ]]></script>
+                                                                                                        </svg>
