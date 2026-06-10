@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="100%" height="100%" style="background: black;">
+    <!-- Le ciel -->
+    <rect x="0" y="0" width="640" height="200" fill="#202040" />
+    <!-- Le sol -->
+    <rect x="0" y="200" width="640" height="200" fill="#404020" />
+    <!-- Viseur -->
+    <line x1="315" y1="195" x2="325" y2="195" stroke="lime" stroke-width="2" />
+    <line x1="320" y1="190" x2="320" y2="210" stroke="lime" stroke-width="2" />
+
+    <!-- HUD -->
+    <text id="hudLevel" x="10" y="20" font-family="monospace" font-size="16" fill="white"></text>
+    <text x="10" y="390" font-family="monospace" font-size="14" fill="white">Flèches directionnelles pour se déplacer</text>
+
+    <!-- Groupe contenant les colonnes de murs -->
+    <g id="walls"></g>
+
+    <script type="text/ecmascript"><![CDATA[
+        // --- CONFIGURATION ---
+        const W = 640;
+        const H = 400;
+        const HALF_H = H / 2;
+        const NUM_RAYS = W;
+        const FOV = Math.PI / 3;
+        const HALF_FOV = FOV / 2;
+
+        // Taille de la carte (nombre impératif d'impair pour le générateur DFS)
+        const MAP_W = 21;
+        const MAP_H = 21;
+
+        // --- VARIABLES GLOBALES ---
+        let map = [];
+        let player = { x: 1.5, y: 1.5, angle: 0 };
+        let keys = {};
+        let level = 1;
+
+        // --- INITIALISATION SVG ---
+        const wallGroup = document.getElementById("walls");
+        const hudLevel = document.getElementById("hudLevel");
+        const rects = [];
+        for (let i = 0; i < NUM_RAYS; i++) {
+            let rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", i);
+            rect.setAttribute("width", 1);
+            wallGroup.appendChild(rect);
+            rects.push(rect);
+            }
+
+            // --- GÉNÉRATEUR DE LABYRINTHE (DFS Récursif) ---
+            function generateMaze() {
+            // Initialiser la carte avec que des murs (1)
+            map = [];
+            for (let y = 0; y < MAP_H; y++) {
+                map[y] = [];
+                for (let x = 0; x < MAP_W; x++) {
+                    map[y][x] = 1;
+                    }
+                    }
+
+                    // Fonction de creusement
+                    function carve(cx, cy) {
+                    map[cy][cx] = 0; // Marquer comme vide
+
+                    // Directions: Haut, Bas, Gauche, Droite (saut de 2 cases)
+                    const dirs = [
+                    { dx: 0, dy: -2 },
+                    { dx: 0, dy: 2 },
+                    { dx: -2, dy: 0 },
+                    { dx: 2, dy: 0 }
+                    ];
+
+                    // Mélanger les directions aléatoirement
+                    dirs.sort(() => Math.random() - 0.5);
+
+                    for (let d of dirs) {
+                    let nx = cx + d.dx;
+                    let ny = cy + d.dy;
+
+                    // Vérifier si la case est dans les limites et est un mur
+                    if (nx > 0 && nx < MAP_W - 1 && ny > 0 && ny < MAP_H - 1 && map[ny][nx] === 1) {
+                            // Creuser le mur entre la case actuelle et la prochaine
+                            map[cy + d.dy / 2][cx + d.dx / 2] = 0;
+                            // Continuer le creusement récursivement
+                            carve(nx, ny);
+                            }
+                            }
+                            }
+
+                            // Démarrer le labyrinthe à (1,1)
+                            carve(1, 1);
+
+                            // Placer la sortie (2) en bas à droite
+                            map[MAP_H - 2][MAP_W - 2] = 2;
+                            }
+
+                            // --- GESTION DES INPUTS ---
+                            document.addEventListener("keydown", function(e) { keys[e.key] = true; e.preventDefault(); });
+                            document.addEventListener("keyup", function(e) { keys[e.key] = false; });
+
+                            // --- MOTEUR RAYCASTING (Algorithme DDA) ---
+                            function castRay(ox, oy, angle) {
+                            let dirX = Math.cos(angle);
+                            let dirY = Math.sin(angle);
+
+                            let mapX = Math.floor(ox);
+                            let mapY = Math.floor(oy);
+
+                            let deltaDistX = (dirX === 0) ? 1e30 : Math.abs(1 / dirX);
+                            let deltaDistY = (dirY === 0) ? 1e30 : Math.abs(1 / dirY);
+
+                            let stepX, stepY, sideDistX, sideDistY;
+
+                            if (dirX < 0) { stepX = -1; sideDistX = (ox - mapX) * deltaDistX; }
+                                else { stepX = 1; sideDistX = (mapX + 1.0 - ox) * deltaDistX; }
+
+                                if (dirY < 0) { stepY = -1; sideDistY = (oy - mapY) * deltaDistY; }
+                                    else { stepY = 1; sideDistY = (mapY + 1.0 - oy) * deltaDistY; }
+
+                                    let hit = 0;
+                                    let side = 0;
+
+                                    while (hit === 0) {
+                                    if (sideDistX < sideDistY) {
+                                        sideDistX += deltaDistX; mapX += stepX; side = 0;
+                                        } else {
+                                        sideDistY += deltaDistY; mapY += stepY; side = 1;
+                                        }
+
+                                        // Sécurité hors carte
+                                        if (mapX < 0 || mapX >= MAP_W || mapY < 0 || mapY >= MAP_H) {
+                                                hit = 1; // Considérer les bords comme des murs
+                                                } else if (map[mapY][mapX] > 0) {
+                                                hit = 1; // Touché un mur ou la sortie
+                                                }
+                                                }
+
+                                                let perpWallDist;
+                                                if (side === 0) perpWallDist = sideDistX - deltaDistX;
+                                                else perpWallDist = sideDistY - deltaDistY;
+
+                                                // Retourner la distance, la face, et le type de bloc (1=Mur, 2=Sortie)
+                                                return { dist: perpWallDist, side: side, type: map[mapY][mapX] };
+                                                }
+
+                                                // --- LOGIQUE DE MISE À JOUR ---
+                                                function updatePlayer() {
+                                                let moveSpeed = 0.05;
+                                                let rotSpeed = 0.03;
+
+                                                if (keys["ArrowLeft"]) player.angle -= rotSpeed;
+                                                if (keys["ArrowRight"]) player.angle += rotSpeed;
+
+                                                let dx = 0, dy = 0;
+                                                if (keys["ArrowUp"]) { dx += Math.cos(player.angle) * moveSpeed; dy += Math.sin(player.angle) * moveSpeed; }
+                                                if (keys["ArrowDown"]) { dx -= Math.cos(player.angle) * moveSpeed; dy -= Math.sin(player.angle) * moveSpeed; }
+
+                                                // Collisions avec séparation X/Y (glissement le long des murs)
+                                                let nextX = player.x + dx;
+                                                let nextY = player.y + dy;
+
+                                                if (map[Math.floor(player.y)][Math.floor(nextX)] === 0) player.x = nextX;
+                                                if (map[Math.floor(nextY)][Math.floor(player.x)] === 0) player.y = nextY;
+
+                                                // Vérifier si le joueur marche sur la sortie (Type 2)
+                                                // On utilise un rayon très court devant le joueur
+                                                let checkDist = 0.2;
+                                                let frontX = player.x + Math.cos(player.angle) * checkDist;
+                                                let frontY = player.y + Math.sin(player.angle) * checkDist;
+
+                                                if (map[Math.floor(frontY)][Math.floor(frontX)] === 2) {
+                                                nextLevel();
+                                                }
+                                                }
+
+                                                // --- GESTION DES NIVEAUX ---
+                                                function nextLevel() {
+                                                level++;
+                                                initGame();
+                                                }
+
+                                                function initGame() {
+                                                generateMaze();
+                                                player.x = 1.5;
+                                                player.y = 1.5;
+                                                player.angle = 0;
+                                                hudLevel.textContent = "NIVEAU : " + level;
+                                                }
+
+                                                // --- RENDU ---
+                                                function render() {
+                                                for (let i = 0; i < NUM_RAYS; i++) {
+                                                    let rayAngle = player.angle - HALF_FOV + (i / NUM_RAYS) * FOV;
+                                                    let result = castRay(player.x, player.y, rayAngle);
+
+                                                    let correctedDist = result.dist * Math.cos(rayAngle - player.angle);
+                                                    let lineHeight = H / correctedDist;
+                                                    let drawStart = HALF_H - lineHeight / 2;
+
+                                                    let color;
+                                                    if (result.type === 2) {
+                                                    // La sortie est verte
+                                                    color = result.side === 0 ? "#22BB22" : "#118811";
+                                                    } else {
+                                                    // Les murs sont gris/bleu
+                                                    color = result.side === 0 ? "#AAAAAA" : "#777777";
+                                                    }
+
+                                                    rects[i].setAttribute("y", drawStart);
+                                                    rects[i].setAttribute("height", lineHeight);
+                                                    rects[i].setAttribute("fill", color);
+                                                    }
+                                                    }
+
+                                                    // --- BOUCLE PRINCIPALE ---
+                                                    function gameLoop() {
+                                                    updatePlayer();
+                                                    render();
+                                                    requestAnimationFrame(gameLoop);
+                                                    }
+
+                                                    // Démarrage du jeu
+                                                    initGame();
+                                                    gameLoop();
+                                                    ]]></script>
+                                            </svg>
