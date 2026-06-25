@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Chargement...</title>
+    <link id="dynamic-favicon" rel="icon" type="image/png" href="">
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background-color: #0a0a0a;
+            color: #00ff00;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        canvas { display: none; }
+        .instructions { text-align: center; opacity: 0.7; margin-top: 20px; line-height: 1.8; }
+        kbd { background: #222; padding: 4px 8px; border-radius: 4px; border: 1px solid #555; }
+
+        .highscore-box {
+            margin-top: 30px;
+            padding: 15px 25px;
+            border: 2px solid #ffff00;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .highscore-box span { color: #ffff00; font-size: 24px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>FAVICON SHOOTER</h1>
+    <div class="instructions">
+        <p><kbd>←</kbd> <kbd>→</kbd> pour se déplacer</p>
+        <p><kbd>Espace</kbd> pour tirer</p>
+    </div>
+
+    <div class="highscore-box">
+        🏆 HIGH SCORE : <span id="html-highscore">0</span>
+    </div>
+
+    <canvas id="game-canvas" width="32" height="32"></canvas>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const favicon = document.getElementById('dynamic-favicon');
+        const htmlHighscoreDisplay = document.getElementById('html-highscore');
+
+        const SIZE = 32;
+        let playerX = 14;
+        let bullets = [];
+        let enemies = [];
+        let score = 0;
+        let frameCount = 0;
+        let gameOver = false;
+        let isNewHighScore = false;
+        let lives = 3; // NOUVEAU : Système de vies
+
+        // High Score
+        let highScore = parseInt(localStorage.getItem('faviconShooterHighScore')) || 0;
+        htmlHighscoreDisplay.innerText = highScore;
+
+        // Clavier
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            if (['ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+            keys[e.code] = true;
+
+            if (e.code === 'Space') {
+                if (!gameOver) {
+                    bullets.push({ x: playerX + 1, y: 25 });
+                } else {
+                    // Restart complet
+                    enemies = []; bullets = []; score = 0; lives = 3; gameOver = false; isNewHighScore = false;
+                }
+            }
+        });
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        let lastTime = 0;
+        const fps = 15;
+        const frameDelay = 1000 / fps;
+
+        function gameLoop(currentTime) {
+            requestAnimationFrame(gameLoop);
+
+            if (currentTime - lastTime < frameDelay) return;
+            lastTime = currentTime;
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, SIZE, SIZE);
+
+            if (!gameOver) {
+                frameCount++;
+
+                // Mise à jour du titre avec les emojis de vies
+                let heartsStr = '❤️'.repeat(lives) + '🖤'.repeat(3 - lives);
+                document.title = `${heartsStr} Score: ${score}`;
+
+                // Déplacement
+                if (keys['ArrowLeft']) playerX -= 2;
+                if (keys['ArrowRight']) playerX += 2;
+                if (playerX < 0) playerX = 0;
+                if (playerX > SIZE - 4) playerX = SIZE - 4;
+
+                // Apparition (spawn à y=4 pour laisser la place aux vies en haut)
+                if (frameCount % 50 === 0 && enemies.length < 4) {
+                    enemies.push({ x: Math.floor(Math.random() * (SIZE - 3)), y: 4 });
+                }
+
+                // Mouvements
+                bullets.forEach(b => b.y -= 2);
+                bullets = bullets.filter(b => b.y > 0);
+
+                if (frameCount % 2 === 0) enemies.forEach(e => e.y += 1);
+
+                // --- NOUVEAU : Gestion des vies ---
+                // Les ennemis qui touchent le vaisseau (le canon est à y=26)
+                let enemiesHitPlayer = enemies.filter(e => e.y >= 26);
+
+                if (enemiesHitPlayer.length > 0) {
+                    lives -= enemiesHitPlayer.length; // On perd autant de vies que d'ennemis passés
+                    enemies = enemies.filter(e => e.y < 26); // On supprime ces ennemis
+
+                    if (lives <= 0) {
+                        lives = 0;
+                        gameOver = true;
+                        // Vérification du record
+                        if (score > highScore) {
+                            highScore = score;
+                            localStorage.setItem('faviconShooterHighScore', highScore);
+                            htmlHighscoreDisplay.innerText = highScore;
+                            isNewHighScore = true;
+                        }
+                    }
+                }
+
+                // Collisions Tire/Ennemi
+                let bulletsToRemove = new Set();
+                let enemiesToRemove = new Set();
+
+                bullets.forEach((b, bIdx) => {
+                    enemies.forEach((e, eIdx) => {
+                        if (b.x < e.x + 3 && b.x + 1 > e.x &&
+                            b.y < e.y + 3 && b.y + 2 > e.y) {
+                            bulletsToRemove.add(bIdx);
+                            enemiesToRemove.add(eIdx);
+                            score += 10;
+                        }
+                    });
+                });
+
+                bullets = bullets.filter((_, i) => !bulletsToRemove.has(i));
+                enemies = enemies.filter((_, i) => !enemiesToRemove.has(i));
+
+            } else {
+                // --- EFFET GAME OVER ---
+                if (isNewHighScore) {
+                    ctx.fillStyle = frameCount % 6 < 3 ? '#ffd700' : '#332b00';
+                    document.title = `🏆 NEW RECORD: ${score} ! - Espace pour rejouer`;
+                } else {
+                    ctx.fillStyle = frameCount % 6 < 3 ? '#ff0000' : '#440000';
+                    document.title = `💀 Perdu ! Score: ${score} - Espace`;
+                }
+                ctx.fillRect(0, 0, SIZE, SIZE);
+                frameCount++;
+            }
+
+            // --- DESSIN ---
+
+            // 1. Dessiner les vies (Carrés roses en haut à gauche, 3x3 px)
+            ctx.fillStyle = '#ff3399';
+            for (let i = 0; i < lives; i++) {
+                ctx.fillRect(2 + i * 5, 2, 3, 3);
+            }
+
+            // 2. Dessiner les ennemis (Jaune 3x3)
+            ctx.fillStyle = '#ffff00';
+            enemies.forEach(e => ctx.fillRect(e.x, e.y, 3, 3));
+
+            // 3. Dessiner les tirs (Cyan)
+            ctx.fillStyle = '#00ffff';
+            bullets.forEach(b => ctx.fillRect(b.x, b.y, 1, 2));
+
+            // 4. Dessiner le vaisseau (Vert)
+            if (!gameOver) {
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(playerX, 28, 4, 2); // Corps
+                ctx.fillRect(playerX + 1, 26, 2, 2); // Canon
+            }
+
+            favicon.href = canvas.toDataURL('image/png');
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
