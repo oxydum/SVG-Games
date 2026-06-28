@@ -1,0 +1,445 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox="0 0 1000 800" style="background-color: #1a252a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+    <!-- Fond principal -->
+    <rect x="0" y="0" width="1000" height="800" fill="#1a252a" />
+
+    <!-- Zone de jeu (Grille agrandie) -->
+    <rect x="20" y="20" width="960" height="510" fill="#1e292e" stroke="#34495e" stroke-width="2" rx="5" />
+    <g id="gridGroup"></g>
+
+    <!-- Barre de contrôle principale -->
+    <foreignObject x="20" y="545" width="960" height="85">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; background: #1e292e; border-radius: 5px; padding: 15px 25px; box-sizing: border-box; border: 1px solid #34495e;">
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="btnPlay" style="background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: bold;">▶ Play</button>
+                <button id="btnStep" style="background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px;">⏭ Step</button>
+                <button id="btnRandom" style="background: #f1c40f; color: #2c3e50; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px;">🎲 Random</button>
+                <button id="btnClear" style="background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px;">🗑 Clear</button>
+                <button id="btnSave" style="background: #9b59b6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px;">💾 Save SVG</button>
+            </div>
+
+            <div style="display: flex; gap: 25px; color: white; font-family: monospace; font-size: 16px;">
+                <span>Génération : <strong id="genText" style="color: #2ecc71;">0</strong></span>
+                <span>Population : <strong id="popText" style="color: #3498db;">0</strong></span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; color: white; font-size: 14px;">
+                <span>Lent</span>
+                <input type="range" id="speedSlider" min="10" max="490" value="400" style="cursor: pointer; width: 150px;" />
+                <span>Rapide</span>
+            </div>
+
+        </div>
+    </foreignObject>
+
+    <!-- Nouveau Panneau de Paramètres -->
+    <foreignObject x="20" y="645" width="960" height="140">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: center; justify-content: space-around; width: 100%; height: 100%; background: #1e292e; border-radius: 5px; padding: 20px 25px; box-sizing: border-box; border: 1px solid #34495e; color: white; font-size: 14px;">
+
+            <!-- Section Règles -->
+            <div style="display: flex; flex-direction: column; gap: 15px; flex: 1.5;">
+                <strong style="color:#ecf0f1; text-transform: uppercase; letter-spacing: 1px; font-size: 13px;">Règles de l'Univers</strong>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <select id="rulePreset" style="padding: 10px; background: #2c3e50; color: white; border: 1px solid #34495e; border-radius: 4px; font-size: 14px; cursor: pointer; width: 240px;">
+                        <option value="3/2,3">Conway (Classique)</option>
+                        <option value="3,6/2,3">HighLife (Réplicateurs)</option>
+                        <option value="3,6,7,8/3,4,6,7,8">Day &amp; Night</option>
+                        <option value="2/">Seeds (Arc-en-ciel)</option>
+                        <option value="1,3,5,7/1,3,5,7">Replicator (Arc-en-ciel)</option>
+                        <option value="3/1,2,3,4,5">Maze (Labyrinthe)</option>
+                        <option value="3/4,5,6,7,8">Coral (Corail)</option>
+                        <option value="3/0,1,2,3,4,5,6,7,8">Life Without Death</option>
+                        <option value="3/1,2">Flock (Nuées)</option>
+                        <option value="1/1">Gnarl (Fractales)</option>
+                        <option value="3,4,5/4,5,6">Assimilation</option>
+                        <option value="3,5,6,7,8/5,6,7,8">Diamoeba (Diamants)</option>
+                        <option value="3/2,4">2x2 (Carrés)</option>
+                        <option value="3,4/3,4">34 Life (Cristaux)</option>
+                        <option value="3,6,7,8/2,3,5,6,7,8">Stains (Taches)</option>
+                        <option value="2/2">Live Free or Die</option>
+                    </select>
+                    <div style="font-family: monospace; background: #2c3e50; padding: 10px 15px; border-radius: 4px; border: 1px solid #34495e;">
+                        B:<span id="dispBorn">3</span> / S:<span id="dispSurv">2,3</span>
+                    </div>
+                </div>
+                <div style="font-size: 11px; color: #95a5a6;">Sélectionnez un univers pour en modifier les lois physiques.</div>
+            </div>
+
+            <!-- Séparateur -->
+            <div style="width: 1px; height: 80%; background: #34495e; margin: 0 20px;"></div>
+
+            <!-- Section Couleurs et Toggles -->
+            <div style="display: flex; flex-direction: column; gap: 15px; flex: 2;">
+                <strong style="color:#ecf0f1; text-transform: uppercase; letter-spacing: 1px; font-size: 13px;">Personnalisation Visuelle</strong>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="color" id="colSurvive" value="#3498db" style="width: 30px; height: 30px; border: none; background: none; cursor: pointer;"/>
+                        <span>Survit</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="color" id="colNew" value="#2ecc71" style="width: 30px; height: 30px; border: none; background: none; cursor: pointer;"/>
+                        <span>Nouvelle</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="color" id="colDying" value="#e74c3c" style="width: 30px; height: 30px; border: none; background: none; cursor: pointer;"/>
+                        <span>Va mourir</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="color" id="colBornDying" value="#f1c40f" style="width: 30px; height: 30px; border: none; background: none; cursor: pointer;"/>
+                        <span>Née condamnée</span>
+                    </label>
+                </div>
+
+                <!-- Bouton de bascule Arc-en-ciel -->
+                <div style="display: flex; justify-content: center; margin-top: 5px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: #2c3e50; padding: 8px 16px; border-radius: 20px; border: 1px solid #34495e;">
+                        <input type="checkbox" id="rainbowMode" style="width: 18px; height: 18px; cursor: pointer;"/>
+                        <span style="font-weight: bold; color: #f1c40f;">🎨 Activer l'effet Arc-en-ciel</span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+    </foreignObject>
+
+    <script type="text/ecmascript"><![CDATA[
+        document.addEventListener('DOMContentLoaded', function() {
+
+        // Paramètres du jeu
+        const COLS = 60;
+        const ROWS = 32;
+        const CELL_SIZE = 16;
+        const OFFSET_X = 20;
+        const OFFSET_Y = 20;
+        const svgns = "http://www.w3.org/2000/svg";
+
+        // Variables d'état
+        let prevGrid = createGrid(ROWS, COLS);
+        let grid = createGrid(ROWS, COLS);
+        let nextGrid = createGrid(ROWS, COLS);
+
+        let isRunning = false;
+        let speed = 100;
+        let intervalId = null;
+        let generation = 0;
+        let isDrawing = false;
+        let drawState = 1;
+
+        // Règles dynamiques
+        let surviveRules = [2, 3];
+        let bornRules = [3];
+        let isRainbow = false;
+
+        // Règles qui déclenchent automatiquement l'arc-en-ciel
+        const rainbowRules = ["2/", "1,3,5,7/1,3,5,7", "1/1", "3/1,2", "2/2"];
+
+        // Couleurs dynamiques
+        let COLOR_BG = "#1e292e";
+        let COLOR_SURVIVE = "#3498db";
+        let COLOR_NEW = "#2ecc71";
+        let COLOR_DYING = "#e74c3c";
+        let COLOR_BORN_DYING = "#f1c40f";
+
+        // Références DOM
+        const gridGroup = document.getElementById('gridGroup');
+        const playBtn = document.getElementById('btnPlay');
+        const genText = document.getElementById('genText');
+        const popText = document.getElementById('popText');
+        const speedSlider = document.getElementById('speedSlider');
+        const ruleSelect = document.getElementById('rulePreset');
+        const dispBorn = document.getElementById('dispBorn');
+        const dispSurv = document.getElementById('dispSurv');
+        const rainbowCheck = document.getElementById('rainbowMode');
+
+        let rectElements = [];
+
+        // Création de la grille visuelle
+        for (let r = 0; r < ROWS; r++) {
+            rectElements[r] = [];
+            for (let c = 0; c < COLS; c++) {
+                let rect = document.createElementNS(svgns, "rect");
+                rect.setAttribute("x", OFFSET_X + c * CELL_SIZE);
+                rect.setAttribute("y", OFFSET_Y + r * CELL_SIZE);
+                rect.setAttribute("width", CELL_SIZE - 1);
+                rect.setAttribute("height", CELL_SIZE - 1);
+                rect.setAttribute("rx", 2);
+                rect.setAttribute("fill", COLOR_BG);
+                rect.style.cursor = "pointer";
+
+                rect.addEventListener("mousedown", function(e) {
+                e.preventDefault();
+                isDrawing = true;
+                drawState = grid[r][c] === 1 ? 0 : 1;
+                setCell(r, c, drawState);
+                });
+
+                rect.addEventListener("mouseover", function(e) {
+                if (isDrawing) {
+                setCell(r, c, drawState);
+                }
+                });
+
+                gridGroup.appendChild(rect);
+                rectElements[r][c] = rect;
+                }
+                }
+
+                // Gestion globale de la souris
+                document.addEventListener("mouseup", function() { isDrawing = false; });
+                document.addEventListener("mouseleave", function() { isDrawing = false; });
+
+                // Boutons de contrôle principaux
+                playBtn.addEventListener("click", togglePlay);
+                document.getElementById('btnStep').addEventListener("click", function() {
+                if (!isRunning) step();
+                });
+                document.getElementById('btnRandom').addEventListener("click", randomize);
+                document.getElementById('btnClear').addEventListener("click", clearGrid);
+                document.getElementById('btnSave').addEventListener("click", saveSVG);
+                speedSlider.addEventListener("input", changeSpeed);
+
+                // Événement de changement de règle
+                ruleSelect.addEventListener("change", function(e) {
+                let val = e.target.value;
+                let parts = val.split('/');
+                bornRules = parts[0].split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+                surviveRules = parts[1] ? parts[1].split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [];
+
+                dispBorn.textContent = bornRules.join(',');
+                dispSurv.textContent = surviveRules.join(',') || "Aucune";
+
+                // Activation auto de l'arc-en-ciel pour certaines règles
+                if (rainbowRules.includes(val)) {
+                isRainbow = true;
+                rainbowCheck.checked = true;
+                } else {
+                isRainbow = false;
+                rainbowCheck.checked = false;
+                }
+
+                pause();
+                updateDisplay();
+                });
+
+                // Événement toggle manuel de l'arc-en-ciel
+                rainbowCheck.addEventListener("change", function(e) {
+                isRainbow = e.target.checked;
+                updateDisplay();
+                });
+
+                // Événements de couleur
+                document.getElementById('colSurvive').addEventListener("input", function(e) {
+                COLOR_SURVIVE = e.target.value;
+                updateDisplay();
+                });
+                document.getElementById('colNew').addEventListener("input", function(e) {
+                COLOR_NEW = e.target.value;
+                updateDisplay();
+                });
+                document.getElementById('colDying').addEventListener("input", function(e) {
+                COLOR_DYING = e.target.value;
+                updateDisplay();
+                });
+                document.getElementById('colBornDying').addEventListener("input", function(e) {
+                COLOR_BORN_DYING = e.target.value;
+                updateDisplay();
+                });
+
+                // Fonctions logiques
+                function createGrid(rows, cols) {
+                let arr = [];
+                for (let r = 0; r < rows; r++) {
+                    arr[r] = [];
+                    for (let c = 0; c < cols; c++) {
+                        arr[r][c] = 0;
+                        }
+                        }
+                        return arr;
+                        }
+
+                        function setCell(r, c, state) {
+                        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                                grid[r][c] = state;
+                                prevGrid[r][c] = state;
+                                updateDisplay();
+                                }
+                                }
+
+                                function updateDisplay() {
+                                let pop = 0;
+
+                                // 1. Calculer la grille suivante
+                                for (let r = 0; r < ROWS; r++) {
+                                    for (let c = 0; c < COLS; c++) {
+                                        let neighbors = countNeighbors(r, c, grid);
+                                        if (grid[r][c] === 1) {
+                                        nextGrid[r][c] = surviveRules.includes(neighbors) ? 1 : 0;
+                                        pop++;
+                                        } else {
+                                        nextGrid[r][c] = bornRules.includes(neighbors) ? 1 : 0;
+                                        }
+                                        }
+                                        }
+
+                                        // 2. Afficher les couleurs
+                                        for (let r = 0; r < ROWS; r++) {
+                                            for (let c = 0; c < COLS; c++) {
+                                                let curr = grid[r][c];
+                                                let prev = prevGrid[r][c];
+                                                let next = nextGrid[r][c];
+                                                let color = COLOR_BG;
+
+                                                if (curr === 1) {
+                                                if (isRainbow) {
+                                                // Calcul de la couleur Arc-en-ciel (HSL)
+                                                // La teinte change selon la génération (temps) et la position (espace)
+                                                let hue = (generation * 15 + r * 8 + c * 8) % 360;
+                                                color = `hsl(${hue}, 85%, 55%)`;
+                                                } else {
+                                                if (next === 1) {
+                                                color = (prev === 1) ? COLOR_SURVIVE : COLOR_NEW;
+                                                } else {
+                                                color = (prev === 1) ? COLOR_DYING : COLOR_BORN_DYING;
+                                                }
+                                                }
+                                                }
+                                                rectElements[r][c].setAttribute("fill", color);
+                                                }
+                                                }
+
+                                                popText.textContent = pop;
+                                                genText.textContent = generation;
+                                                }
+
+                                                function step() {
+                                                let temp = prevGrid;
+                                                prevGrid = grid;
+                                                grid = nextGrid;
+                                                nextGrid = temp;
+
+                                                generation++;
+                                                updateDisplay();
+                                                }
+
+                                                function countNeighbors(r, c, targetGrid) {
+                                                let count = 0;
+                                                for (let i = -1; i <= 1; i++) {
+                                                    for (let j = -1; j <= 1; j++) {
+                                                        if (i === 0 && j === 0) continue;
+                                                        let nr = r + i;
+                                                        let nc = c + j;
+                                                        if (nr < 0) nr = ROWS - 1;
+                                                            if (nr >= ROWS) nr = 0;
+                                                            if (nc < 0) nc = COLS - 1;
+                                                                if (nc >= COLS) nc = 0;
+
+                                                                if (targetGrid[nr][nc] === 1) count++;
+                                                                }
+                                                                }
+                                                                return count;
+                                                                }
+
+                                                                function play() {
+                                                                isRunning = true;
+                                                                playBtn.textContent = "⏸ Pause";
+                                                                playBtn.style.background = "#e67e22";
+                                                                intervalId = setInterval(step, speed);
+                                                                }
+
+                                                                function pause() {
+                                                                isRunning = false;
+                                                                playBtn.textContent = "▶ Play";
+                                                                playBtn.style.background = "#3498db";
+                                                                clearInterval(intervalId);
+                                                                }
+
+                                                                function togglePlay() {
+                                                                if (isRunning) pause();
+                                                                else play();
+                                                                }
+
+                                                                function clearGrid() {
+                                                                pause();
+                                                                prevGrid = createGrid(ROWS, COLS);
+                                                                grid = createGrid(ROWS, COLS);
+                                                                nextGrid = createGrid(ROWS, COLS);
+                                                                generation = 0;
+                                                                updateDisplay();
+                                                                }
+
+                                                                function randomize() {
+                                                                pause();
+                                                                for (let r = 0; r < ROWS; r++) {
+                                                                    for (let c = 0; c < COLS; c++) {
+                                                                        let rand = Math.random() > 0.75 ? 1 : 0;
+                                                                        grid[r][c] = rand;
+                                                                        prevGrid[r][c] = rand;
+                                                                        }
+                                                                        }
+                                                                        generation = 0;
+                                                                        updateDisplay();
+                                                                        }
+
+                                                                        function changeSpeed() {
+                                                                        speed = 500 - speedSlider.value;
+                                                                        if (isRunning) {
+                                                                        pause();
+                                                                        play();
+                                                                        }
+                                                                        }
+
+                                                                        function saveSVG() {
+                                                                        let svgWidth = COLS * CELL_SIZE;
+                                                                        let svgHeight = ROWS * CELL_SIZE;
+                                                                        let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">\n`;
+                                                                            svgStr += `  <rect width="100%" height="100%" fill="${COLOR_BG}"/>\n`;
+
+                                                                            for (let r = 0; r < ROWS; r++) {
+                                                                                for (let c = 0; c < COLS; c++) {
+                                                                                    if (grid[r][c] === 1) {
+                                                                                    let x = c * CELL_SIZE;
+                                                                                    let y = r * CELL_SIZE;
+                                                                                    let color = rectElements[r][c].getAttribute('fill');
+                                                                                    svgStr += `  <rect x="${x}" y="${y}" width="${CELL_SIZE - 1}" height="${CELL_SIZE - 1}" rx="2" fill="${color}"/>\n`;
+                                                                                    }
+                                                                                    }
+                                                                                    }
+                                                                                    svgStr += `</svg>`;
+
+                                                                                let blob = new Blob([svgStr], {type: "image/svg+xml;charset=utf-8"});
+                                                                                let url = URL.createObjectURL(blob);
+
+                                                                                let a = document.createElementNS('http://www.w3.org/1999/xhtml', 'a');
+                                                                                a.href = url;
+                                                                                a.download = 'matrice-jeu-de-la-vie.svg';
+
+                                                                                document.documentElement.appendChild(a);
+                                                                                a.click();
+                                                                                document.documentElement.removeChild(a);
+
+                                                                                setTimeout(function() {
+                                                                                URL.revokeObjectURL(url);
+                                                                                }, 100);
+                                                                                }
+
+                                                                                // Configuration initiale
+                                                                                let p = [[5,10],[5,11],[5,12],[5,16],[5,17],[5,18],
+                                                                                [7,8],[7,13],[7,15],[7,20],
+                                                                                [8,8],[8,13],[8,15],[8,20],
+                                                                                [9,8],[9,13],[9,15],[9,20],
+                                                                                [10,10],[10,11],[10,12],[10,16],[10,17],[10,18],
+                                                                                [12,10],[12,11],[12,12],[12,16],[12,17],[12,18],
+                                                                                [13,8],[13,13],[13,15],[13,20],
+                                                                                [14,8],[14,13],[14,15],[14,20],
+                                                                                [15,8],[15,13],[15,15],[15,20],
+                                                                                [17,10],[17,11],[17,12],[17,16],[17,17],[17,18]];
+                                                                                p.forEach(coord => {
+                                                                                grid[coord[0]][coord[1]] = 1;
+                                                                                prevGrid[coord[0]][coord[1]] = 1;
+                                                                                });
+
+                                                                                updateDisplay();
+                                                                                });
+                                                                                ]]></script>
+                                                                        </svg>
