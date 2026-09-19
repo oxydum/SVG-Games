@@ -1,0 +1,673 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 800 600" width="100%" height="100%" tabindex="0" focusable="true">
+    <defs>
+        <!-- Clip Path -->
+        <clipPath id="screenClip">
+            <rect width="800" height="600"/>
+        </clipPath>
+
+        <!-- Gradients -->
+        <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0b0512"/>
+            <stop offset="50%" stop-color="#1a0a2e"/>
+            <stop offset="100%" stop-color="#05010a"/>
+        </linearGradient>
+
+        <linearGradient id="sunGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffdf00"/>
+            <stop offset="50%" stop-color="#ff5e00"/>
+            <stop offset="100%" stop-color="#ff00aa"/>
+        </linearGradient>
+
+        <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1a0a3a"/>
+            <stop offset="100%" stop-color="#000000"/>
+        </linearGradient>
+
+        <linearGradient id="crystalGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#00ffcc"/>
+            <stop offset="50%" stop-color="#00aaff"/>
+            <stop offset="100%" stop-color="#0044ff"/>
+        </linearGradient>
+
+        <linearGradient id="dinoGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#00ffff"/>
+            <stop offset="100%" stop-color="#0088ff"/>
+        </linearGradient>
+
+        <!-- Patterns -->
+        <pattern id="groundGrid" width="60" height="30" patternUnits="userSpaceOnUse" patternTransform="skewX(-30)">
+            <path d="M 0,0 L 60,0 M 0,0 L 0,30 M 30,0 L 30,30 M 60,0 L 60,30" fill="none" stroke="rgba(0,255,204,0.4)" stroke-width="1.5"/>
+        </pattern>
+
+        <pattern id="bgGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,255,204,0.03)" stroke-width="1"/>
+        </pattern>
+
+        <!-- Scanlines -->
+        <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="2" fill="rgba(0,0,0,0)"/>
+            <rect y="2" width="4" height="2" fill="rgba(0,0,0,0.15)"/>
+        </pattern>
+
+        <!-- Glow Filters -->
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+
+        <filter id="glowStrong" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="8" result="blur"/>
+            <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Main Game Area with Clip -->
+    <g clip-path="url(#screenClip)">
+        <!-- Background -->
+        <rect width="800" height="600" fill="url(#bgGrad)"/>
+        <rect width="800" height="600" fill="url(#bgGrid)"/>
+        <rect width="800" height="600" fill="url(#scanlines)"/>
+
+        <!-- Synthwave Sun -->
+        <g filter="url(#glowStrong)">
+            <circle cx="400" cy="400" r="120" fill="url(#sunGrad)"/>
+            <rect x="280" y="350" width="240" height="8" fill="#0b0512"/>
+            <rect x="280" y="370" width="240" height="12" fill="#0b0512"/>
+            <rect x="280" y="395" width="240" height="16" fill="#0b0512"/>
+            <rect x="280" y="425" width="240" height="22" fill="#0b0512"/>
+        </g>
+
+        <!-- Distant Mountains -->
+        <g filter="url(#glow)" opacity="0.5">
+            <polygon points="100,500 250,350 400,500" fill="none" stroke="#00ffcc" stroke-width="3"/>
+            <polygon points="300,500 500,300 700,500" fill="none" stroke="#ff00aa" stroke-width="3"/>
+        </g>
+
+        <!-- World Layer -->
+        <g id="world">
+            <!-- Scrolling Ground -->
+            <g id="groundLayer">
+                <rect x="-200" y="500" width="1200" height="100" fill="url(#groundGrad)"/>
+                <rect x="-200" y="500" width="1200" height="100" fill="url(#groundGrid)"/>
+                <line x1="-200" y1="500" x2="1000" y2="500" stroke="#00ffcc" stroke-width="4" filter="url(#glow)"/>
+            </g>
+
+            <!-- Dynamic Elements -->
+            <g id="dynamicEntities"></g>
+
+            <!-- Neural Link -->
+            <path id="seekPath" stroke="rgba(255,0,170,0.5)" stroke-width="1.5" fill="none" stroke-dasharray="6,4" filter="url(#glow)"/>
+
+            <!-- Speed Lines -->
+            <g id="speedLines" opacity="0"></g>
+
+            <!-- Player (Cyber-Raptor) -->
+            <g id="dino" filter="url(#glow)" pointer-events="none">
+                <path d="M -10,35 L 0,20 L 0,15 L 10,5 L 35,5 L 45,15 L 45,25 L 35,30 L 35,40 L 30,40 L 30,30 L 15,30 L 15,40 L 10,40 L 10,30 L -10,35 Z M 35,10 L 35,15 L 40,15 L 40,10 Z" fill="url(#dinoGrad)"/>
+                <rect id="leg1" x="15" y="30" width="5" height="10" fill="#00aaff"/>
+                <rect id="leg2" x="30" y="30" width="5" height="10" fill="#00aaff"/>
+                <rect x="36" y="8" width="8" height="3" fill="#ff00ff"/>
+            </g>
+        </g>
+
+        <!-- UI Layer -->
+        <g id="ui" pointer-events="none">
+            <!-- Viewport Frame -->
+            <rect x="5" y="5" width="790" height="590" fill="none" stroke="#00ffcc" stroke-width="2" opacity="0.4" pointer-events="none"/>
+            <rect x="15" y="15" width="770" height="570" fill="none" stroke="#00ffcc" stroke-width="1" opacity="0.1" pointer-events="none"/>
+
+            <!-- Score -->
+            <text id="scoreText" x="780" y="40" fill="#00ffff" font-family="monospace" font-size="28" text-anchor="end" font-weight="bold" filter="url(#glow)">0</text>
+            <text id="highScoreText" x="780" y="60" fill="rgba(0,255,255,0.6)" font-family="monospace" font-size="14" text-anchor="end">HI: 0</text>
+
+            <!-- Holographic HUD -->
+            <g transform="translate(20, 20)">
+                <rect width="320" height="130" fill="rgba(10,10,30,0.7)" stroke="#00ffcc" stroke-width="1" rx="0"/>
+                <!-- Corner brackets -->
+                <path d="M 0,10 L 0,0 L 10,0 M 310,0 L 320,0 L 320,10 M 320,120 L 320,130 L 310,130 M 10,130 L 0,130 L 0,120" fill="none" stroke="#00ffff" stroke-width="2"/>
+
+                <text x="15" y="25" fill="#00ffff" font-family="monospace" font-size="14" font-weight="bold">SYSTEM STATUS</text>
+                <line x1="15" y1="30" x2="305" y2="30" stroke="#00ffcc" stroke-width="1" opacity="0.5"/>
+
+                <!-- Speed Bar -->
+                <text x="15" y="50" fill="#ffcc00" font-family="monospace" font-size="12">SPEED</text>
+                <rect x="85" y="40" width="220" height="10" fill="rgba(255,255,255,0.1)" stroke="#ffcc00" stroke-width="1"/>
+                <rect id="speedBar" x="85" y="40" width="110" height="10" fill="#ffcc00" filter="url(#glow)"/>
+
+                <text id="brainStatus" x="15" y="70" fill="#00ff88" font-family="monospace" font-size="12">STATE: IDLE</text>
+                <text id="flyCount" x="15" y="90" fill="#00ff88" font-family="monospace" font-size="12">AGENTS: 0</text>
+                <text id="jumpsText" x="15" y="110" fill="#00ffcc" font-family="monospace" font-size="12">JUMPS: 2</text>
+                <text x="15" y="125" fill="rgba(0,255,136,0.5)" font-family="monospace" font-size="10">[←/→] MOVE &amp; SPEED | [SPACE] JUMP</text>
+            </g>
+
+            <!-- Start Menu -->
+            <g id="menuGroup">
+                <rect width="800" height="600" fill="rgba(0,0,0,0.6)"/>
+                <text x="400" y="200" fill="#00ffff" font-family="monospace" font-size="56" text-anchor="middle" font-weight="bold" filter="url(#glow)">NEON RAPTOR</text>
+                <text x="400" y="240" fill="#ff00aa" font-family="monospace" font-size="20" text-anchor="middle" filter="url(#glow)">FLY SIMULATION SYSTEM</text>
+                <text x="400" y="330" fill="#ffffff" font-family="monospace" font-size="16" text-anchor="middle">[SPACE] to START &amp; JUMP (Double Jump)</text>
+                <text x="400" y="360" fill="#ffcc00" font-family="monospace" font-size="14" text-anchor="middle">[← / →] to MOVE &amp; CHANGE SPEED</text>
+                <text x="400" y="390" fill="rgba(255,255,255,0.5)" font-family="monospace" font-size="12" text-anchor="middle">DODGE FLIES BY SHIFTING HORIZONTALLY</text>
+            </g>
+
+            <!-- Game Over Menu -->
+            <g id="gameOverGroup" style="display:none;">
+                <rect width="800" height="600" fill="rgba(0,0,0,0.8)"/>
+                <text x="400" y="200" fill="#ff00aa" font-family="monospace" font-size="48" text-anchor="middle" font-weight="bold" filter="url(#glow)">SYSTEM FAILURE</text>
+                <text id="finalScoreText" x="400" y="260" fill="#00ffff" font-family="monospace" font-size="24" text-anchor="middle">SCORE: 0</text>
+                <text x="400" y="350" fill="#ffffff" font-family="monospace" font-size="16" text-anchor="middle">CLICK OR PRESS [SPACE] TO REBOOT</text>
+            </g>
+        </g>
+    </g>
+
+    <script type="text/ecmascript"><![CDATA[
+        // ==========================================
+        // NEON RAPTOR - FLY DINO REPLICA v5.1
+        // ==========================================
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.documentElement;
+        const world = document.getElementById('world');
+        const dynamicEntities = document.getElementById('dynamicEntities');
+        const dino = document.getElementById('dino');
+        const leg1 = document.getElementById('leg1');
+        const leg2 = document.getElementById('leg2');
+        const groundLayer = document.getElementById('groundLayer');
+        const seekPath = document.getElementById('seekPath');
+        const speedLinesGroup = document.getElementById('speedLines');
+        const speedBar = document.getElementById('speedBar');
+
+        // UI References
+        const scoreText = document.getElementById('scoreText');
+        const highScoreText = document.getElementById('highScoreText');
+        const menuGroup = document.getElementById('menuGroup');
+        const gameOverGroup = document.getElementById('gameOverGroup');
+        const finalScoreText = document.getElementById('finalScoreText');
+        const brainStatusText = document.getElementById('brainStatus');
+        const flyCountText = document.getElementById('flyCount');
+        const jumpsText = document.getElementById('jumpsText');
+
+        // Game State
+        let state = 'menu';
+        let score = 0;
+        let highScore = 0;
+        let baseSpeed = 4;
+        let currentSpeedMod = 0;
+        let speed = 4;
+        let spawnTimer = 1000;
+        let time = 0;
+        let groundX = 0;
+        let isJumpPressed = false;
+
+        // Inputs
+        let keysPressed = { ArrowRight: false, ArrowLeft: false };
+
+        // Player Physics (Ajout de la vélocité horizontale hvx)
+        const player = {
+        x: 100,
+        y: 460,
+        vy: 0,
+        hvx: 0, // Vitesse horizontale du dino
+        jumpsLeft: 2,
+        height: 45,
+        width: 50
+        };
+        const gravity = 0.8;
+        const jumpForce = -14;
+        const groundY = 500;
+
+        let obstacles = [];
+        let flies = [];
+
+        // ==========================================
+        // FLY BRAIN SIMULATION v5.1
+        // ==========================================
+        class FlyBrain {
+        constructor() {
+        this.wanderAngle = Math.random() * Math.PI * 2;
+        this.targetAltitude = 150 + Math.random() * 200;
+        this.annoyanceLevel = 0;
+        this.state = "WANDER";
+
+        this.learningRate = 0.04;
+        this.playerMemory = { x: 0, y: 0 };
+        this.trackingError = 100;
+        }
+
+        process(sensors) {
+        let motorAx = 0;
+        let motorAy = 0;
+
+        if (sensors.selfY > sensors.groundY - 30) {
+        motorAy -= 4.5;
+        this.state = "EVADE";
+        } else {
+        let altError = (sensors.groundY - sensors.selfY) - this.targetAltitude;
+        motorAy += altError * 0.005;
+
+        let dx = sensors.playerX - sensors.selfX;
+        let dy = sensors.playerY - sensors.selfY;
+        let dist = Math.hypot(dx, dy);
+
+        if (dist < 250) {
+            this.annoyanceLevel = Math.min(1, this.annoyanceLevel + 0.03);
+            this.playerMemory.x += (sensors.playerX - this.playerMemory.x) * this.learningRate;
+            this.playerMemory.y += (sensors.playerY - this.playerMemory.y) * this.learningRate;
+            this.trackingError = Math.max(20, this.trackingError - 0.1);
+            this.state = "SEEK";
+
+            let memDx = this.playerMemory.x - sensors.selfX;
+            let memDy = this.playerMemory.y - sensors.selfY;
+            let memDist = Math.hypot(memDx, memDy);
+
+            if (memDist > 0) {
+            let force = 0.4 + (1 - this.trackingError/100) * 0.4;
+            motorAx += (memDx > 0 ? force : -force) * this.annoyanceLevel;
+            motorAy += (memDy / memDist) * force * this.annoyanceLevel;
+            }
+            } else {
+            this.annoyanceLevel = Math.max(0, this.annoyanceLevel - 0.05);
+            this.state = "WANDER";
+            this.wanderAngle += (Math.random() - 0.5) * 0.6;
+            motorAx += Math.cos(this.wanderAngle) * 0.15;
+            }
+            }
+
+            return { ax: motorAx, ay: motorAy, state: this.state };
+            }
+            }
+
+            // ==========================================
+            // ENTITY FACTORIES
+            // ==========================================
+            function createCactusElement(h) {
+            let g = document.createElementNS(svgNS, 'g');
+
+            let trunk = document.createElementNS(svgNS, 'polygon');
+            trunk.setAttribute('points', `10,0 5,${-h*0.5} 10,${-h*0.8} 15,${-h*0.5}`);
+            trunk.setAttribute('fill', 'url(#crystalGrad)');
+            trunk.setAttribute('filter', 'url(#glow)');
+
+            let armL = document.createElementNS(svgNS, 'polygon');
+            armL.setAttribute('points', `5,${-h*0.5} -10,${-h*0.6} -5,${-h*0.8} 0,${-h*0.65}`);
+            armL.setAttribute('fill', 'url(#crystalGrad)');
+            armL.setAttribute('filter', 'url(#glow)');
+
+            let armR = document.createElementNS(svgNS, 'polygon');
+            armR.setAttribute('points', `15,${-h*0.5} 25,${-h*0.6} 20,${-h*0.85} 15,${-h*0.65}`);
+            armR.setAttribute('fill', 'url(#crystalGrad)');
+            armR.setAttribute('filter', 'url(#glow)');
+
+            let core = document.createElementNS(svgNS, 'polygon');
+            core.setAttribute('points', `10,0 10,${-h*0.8} 10,${-h*0.5}`);
+            core.setAttribute('fill', '#ffffff');
+            core.setAttribute('opacity', '0.6');
+
+            g.appendChild(trunk);
+            g.appendChild(armL);
+            g.appendChild(armR);
+            g.appendChild(core);
+            return g;
+            }
+
+            function createFlyElement() {
+            let g = document.createElementNS(svgNS, 'g');
+
+            let trail = document.createElementNS(svgNS, 'line');
+            trail.setAttribute('x1', '15'); trail.setAttribute('y1', '0');
+            trail.setAttribute('x2', '0'); trail.setAttribute('y2', '0');
+            trail.setAttribute('stroke', '#ff00ff');
+            trail.setAttribute('stroke-width', '3');
+            trail.setAttribute('stroke-dasharray', '1,3');
+            trail.setAttribute('opacity', '0.7');
+            trail.setAttribute('filter', 'url(#glow)');
+
+            let wing1 = document.createElementNS(svgNS, 'polygon');
+            wing1.setAttribute('points', '-2,-3 -8,-8 -6,-2');
+            wing1.setAttribute('fill', 'rgba(0,255,255,0.6)');
+
+            let wing2 = document.createElementNS(svgNS, 'polygon');
+            wing2.setAttribute('points', '2,-3 8,-8 6,-2');
+            wing2.setAttribute('fill', 'rgba(0,255,255,0.6)');
+
+            let body = document.createElementNS(svgNS, 'circle');
+            body.setAttribute('cx', '0'); body.setAttribute('cy', '0');
+            body.setAttribute('r', '4');
+            body.setAttribute('fill', '#ff00ff');
+            body.setAttribute('filter', 'url(#glow)');
+
+            g.appendChild(trail);
+            g.appendChild(wing1);
+            g.appendChild(wing2);
+            g.appendChild(body);
+
+            return { element: g, wing1: wing1, wing2: wing2 };
+            }
+
+            function spawnObstacle() {
+            if (Math.random() > 0.35) {
+            let h = Math.random() * 40 + 50;
+            let cactus = { x: 800, y: 500, w: 20, h: h, element: createCactusElement(h) };
+            obstacles.push(cactus);
+            dynamicEntities.appendChild(cactus.element);
+            } else {
+            let flyObj = createFlyElement();
+            let fly = {
+            x: 850,
+            y: Math.random() * 300 + 100,
+            vx: 0, vy: 0,
+            element: flyObj.element,
+            wing1: flyObj.wing1,
+            wing2: flyObj.wing2,
+            brain: new FlyBrain()
+            };
+            flies.push(fly);
+            dynamicEntities.appendChild(fly.element);
+            }
+            }
+
+            // ==========================================
+            // GAME LOGIC
+            // ==========================================
+            function jump() {
+            if (state === 'menu') {
+            startGame();
+            player.vy = jumpForce;
+            player.jumpsLeft = 1;
+            } else if (state === 'playing' && player.jumpsLeft > 0) {
+            player.vy = jumpForce;
+            player.jumpsLeft--;
+            } else if (state === 'gameover') {
+            resetGame();
+            player.vy = jumpForce;
+            player.jumpsLeft = 1;
+            }
+            jumpsText.textContent = `JUMPS: ${player.jumpsLeft}`;
+            }
+
+            function startGame() {
+            state = 'playing';
+            menuGroup.setAttribute('display', 'none');
+            }
+
+            function gameOver() {
+            state = 'gameover';
+            if (score > highScore) {
+            highScore = Math.floor(score);
+            highScoreText.textContent = `HI: ${highScore}`;
+            }
+            gameOverGroup.setAttribute('display', 'block');
+            finalScoreText.textContent = `SCORE: ${Math.floor(score)}`;
+            }
+
+            function resetGame() {
+            obstacles.forEach(o => dynamicEntities.removeChild(o.element));
+            flies.forEach(f => dynamicEntities.removeChild(f.element));
+            obstacles = [];
+            flies = [];
+            score = 0;
+            player.x = 100;
+            player.y = 460;
+            player.vy = 0;
+            player.hvx = 0;
+            player.jumpsLeft = 2;
+            spawnTimer = 1000;
+            state = 'playing';
+            gameOverGroup.setAttribute('display', 'none');
+            }
+
+            function update(delta) {
+            time += delta * 16.6667;
+            score += 0.1 * delta;
+
+            // Gestion de la vitesse du monde ET du mouvement horizontal du Dino
+            baseSpeed = 4 + Math.min(5, score / 50);
+            let targetSpeedMod = 0;
+            let targetHvx = 0; // Vitesse horizontale du Dino
+
+            if (keysPressed.ArrowRight) {
+            targetSpeedMod = 4;
+            targetHvx = 6;  // Déplacement vers la droite
+            }
+            if (keysPressed.ArrowLeft) {
+            targetSpeedMod = -3;
+            targetHvx = -5; // Déplacement vers la gauche
+            }
+
+            currentSpeedMod += (targetSpeedMod - currentSpeedMod) * 0.1 * delta;
+            speed = baseSpeed + currentSpeedMod;
+            if (speed < 1.5) speed = 1.5;
+
+                // Mouvement horizontal du Dino (avec inertie)
+                player.hvx += (targetHvx - player.hvx) * 0.2 * delta;
+                player.x += player.hvx * delta;
+
+                // Limites de l'écran pour le Dino
+                if (player.x < 30) { player.x = 30; player.hvx = 0; }
+                    if (player.x > 750) { player.x = 750; player.hvx = 0; }
+
+                    // UI de la vitesse
+                    let speedPct = ((speed - 1.5) / (baseSpeed + 4 - 1.5)) * 220;
+                    speedBar.setAttribute('width', speedPct);
+                    speedBar.setAttribute('fill', currentSpeedMod > 1 ? '#ff00ff' : '#ffcc00');
+
+                    speedLinesGroup.setAttribute('opacity', Math.max(0, (currentSpeedMod - 1) / 3));
+
+                    scoreText.textContent = Math.floor(score);
+
+                    // Physique verticale du joueur
+                    player.vy += gravity * delta;
+                    player.y += player.vy * delta;
+
+                    if (player.y >= groundY - player.height) {
+                    player.y = groundY - player.height;
+                    player.vy = 0;
+                    player.jumpsLeft = 2;
+                    jumpsText.textContent = `JUMPS: ${player.jumpsLeft}`;
+                    }
+
+                    // Défilement du sol
+                    groundX -= speed * delta;
+                    if (groundX < -60) groundX += 60;
+                        groundLayer.setAttribute('transform', `translate(${groundX}, 0)`);
+
+                        // Spawn
+                        spawnTimer -= delta * 16.6667;
+                        if (spawnTimer <= 0) {
+                            spawnObstacle();
+                            spawnTimer = 900 + Math.random() * 1200 - (speed * 40);
+                            if (spawnTimer < 500) spawnTimer = 500;
+                                }
+
+                                // Cactus
+                                for (let i = obstacles.length - 1; i >= 0; i--) {
+                                let o = obstacles[i];
+                                // Le cactus se déplace en fonction de la vitesse du monde, mais aussi un peu si le dino avance
+                                // En fait, non, le dino bouge dans le référentiel du monde, donc les obstacles boulement seulement à la vitesse du monde.
+                                o.x -= speed * delta;
+                                o.element.setAttribute('transform', `translate(${o.x}, ${o.y})`);
+
+                                if (o.x < -50) {
+                                    dynamicEntities.removeChild(o.element);
+                                    obstacles.splice(i, 1);
+                                    } else {
+                                    if (player.x + 5 < o.x + o.w && player.x + player.width - 5 > o.x &&
+                                        player.y + player.height > o.y - o.h + 5) {
+                                        gameOver();
+                                        return;
+                                        }
+                                        }
+                                        }
+
+                                        // Mouches
+                                        let seekPaths = "";
+
+                                        for (let i = flies.length - 1; i >= 0; i--) {
+                                        let f = flies[i];
+                                        let sensors = {
+                                        selfX: f.x, selfY: f.y,
+                                        playerX: player.x + 15, playerY: player.y + 20,
+                                        groundY: groundY
+                                        };
+                                        let out = f.brain.process(sensors);
+
+                                        f.vx += out.ax * delta;
+                                        f.vy += out.ay * delta;
+
+                                        f.x += f.vx * delta;
+                                        f.y += f.vy * delta;
+
+                                        // Le défilement du monde pousse toujours la mouche
+                                        f.x -= speed * 0.6 * delta;
+
+                                        f.vx *= 0.95;
+                                        f.vy *= 0.95;
+                                        let sp = Math.hypot(f.vx, f.vy);
+                                        if (sp > 5) {
+                                        f.vx = (f.vx / sp) * 5;
+                                        f.vy = (f.vy / sp) * 5;
+                                        }
+
+                                        let angle = Math.atan2(f.vy, f.vx) * 180 / Math.PI;
+                                        f.element.setAttribute('transform', `translate(${f.x}, ${f.y}) rotate(${angle})`);
+
+                                        let wingFlap = Math.abs(Math.sin(time / 12)) * 3;
+                                        f.wing1.setAttribute('points', `-2,-3 ${-8 - wingFlap},${-8 - wingFlap} -6,-2`);
+                                        f.wing2.setAttribute('points', `2,-3 ${8 + wingFlap},${-8 - wingFlap} 6,-2`);
+
+                                        if (f.brain.state === "SEEK") {
+                                        seekPaths += `M ${f.x} ${f.y} L ${f.brain.playerMemory.x} ${f.brain.playerMemory.y} `;
+                                        }
+
+                                        if (f.x < -50) {
+                                            dynamicEntities.removeChild(f.element);
+                                            flies.splice(i, 1);
+                                            } else {
+                                            let dist = Math.hypot(f.x - (player.x + 15), f.y - (player.y + 20));
+                                            if (dist < 18) {
+                                                gameOver();
+                                                return;
+                                                }
+                                                }
+                                                }
+
+                                                seekPath.setAttribute('d', seekPaths);
+
+                                                let activeStates = flies.map(f => f.brain.state);
+                                                let primaryState = "IDLE";
+                                                if (activeStates.includes("SEEK")) primaryState = "SEEK";
+                                                else if (activeStates.includes("EVADE")) primaryState = "EVADE";
+                                                else if (activeStates.includes("WANDER")) primaryState = "WANDER";
+
+                                                brainStatusText.textContent = `STATE: ${primaryState}`;
+                                                flyCountText.textContent = `AGENTS: ${flies.length}`;
+                                                }
+
+                                                function render() {
+                                                // Rotation dynamique du Dino (saut + mouvement horizontal)
+                                                let yAngle = 0;
+                                                if (player.jumpsLeft < 2) {
+                                                    yAngle = Math.max(-20, Math.min(20, player.vy * 1.5));
+                                                    }
+                                                    let xAngle = player.hvx * 2; // Inclinaison horizontale
+                                                    let totalAngle = Math.max(-30, Math.min(30, yAngle + xAngle));
+
+                                                    dino.setAttribute('transform', `translate(${player.x}, ${player.y}) rotate(${totalAngle}, 25, 20)`);
+
+                                                    if (state === 'playing' && player.jumpsLeft == 2) {
+                                                    let legPhase = Math.sin(time / 40) * 4;
+                                                    leg1.setAttribute('y', 30 + legPhase);
+                                                    leg2.setAttribute('y', 30 - legPhase);
+                                                    } else {
+                                                    leg1.setAttribute('y', 35);
+                                                    leg2.setAttribute('y', 35);
+                                                    }
+
+                                                    while (speedLinesGroup.children.length < 5) {
+                                                        let line = document.createElementNS(svgNS, 'line');
+                                                        line.setAttribute('x1', '800');
+                                                        line.setAttribute('x2', '900');
+                                                        line.setAttribute('stroke', 'rgba(0,255,255,0.6)');
+                                                        line.setAttribute('stroke-width', '3');
+                                                        speedLinesGroup.appendChild(line);
+                                                        }
+                                                        for (let i = 0; i < speedLinesGroup.children.length; i++) {
+                                                            let line = speedLinesGroup.children[i];
+                                                            let y = Math.random() * 400 + 100;
+                                                            let x = 800 - ((time * speed * 5 + i * 150) % 400);
+                                                            line.setAttribute('y1', y);
+                                                            line.setAttribute('y2', y);
+                                                            line.setAttribute('x1', x);
+                                                            line.setAttribute('x2', x + 100);
+                                                            }
+                                                            }
+
+                                                            // ==========================================
+                                                            // MAIN LOOP
+                                                            // ==========================================
+                                                            let lastTime = 0;
+                                                            function loop(timestamp) {
+                                                            let delta = (timestamp - lastTime) / 16.6667;
+                                                            lastTime = timestamp;
+                                                            if (delta > 2) delta = 2;
+
+                                                            if (state === 'playing') {
+                                                            update(delta);
+                                                            }
+                                                            render();
+                                                            requestAnimationFrame(loop);
+                                                            }
+
+                                                            // ==========================================
+                                                            // INPUT LISTENERS
+                                                            // ==========================================
+                                                            function handleInputDown(e) {
+                                                            if (e && e.preventDefault) e.preventDefault();
+
+                                                            if (e.code === 'Space' || e.code === 'ArrowUp' || e.type === 'mousedown') {
+                                                            if (!isJumpPressed) {
+                                                            isJumpPressed = true;
+                                                            jump();
+                                                            }
+                                                            }
+
+                                                            if (e.code === 'ArrowRight') keysPressed.ArrowRight = true;
+                                                            if (e.code === 'ArrowLeft') keysPressed.ArrowLeft = true;
+                                                            }
+
+                                                            function handleInputUp(e) {
+                                                            if (e && e.preventDefault) e.preventDefault();
+
+                                                            if (e.code === 'Space' || e.code === 'ArrowUp' || e.type === 'mouseup') {
+                                                            isJumpPressed = false;
+                                                            }
+                                                            if (e.code === 'ArrowRight') keysPressed.ArrowRight = false;
+                                                            if (e.code === 'ArrowLeft') keysPressed.ArrowLeft = false;
+                                                            }
+
+                                                            if (typeof window !== 'undefined') {
+                                                            window.addEventListener('keydown', handleInputDown);
+                                                            window.addEventListener('keyup', handleInputUp);
+                                                            window.addEventListener('mousedown', handleInputDown);
+                                                            window.addEventListener('mouseup', handleInputUp);
+                                                            }
+                                                            if (typeof document !== 'undefined') {
+                                                            document.addEventListener('keydown', handleInputDown);
+                                                            document.addEventListener('keyup', handleInputUp);
+                                                            document.addEventListener('mousedown', handleInputDown);
+                                                            document.addEventListener('mouseup', handleInputUp);
+                                                            }
+
+                                                            // Initialize
+                                                            menuGroup.setAttribute('display', 'block');
+                                                            gameOverGroup.setAttribute('display', 'none');
+                                                            requestAnimationFrame(loop);
+                                                            ]]></script>
+                                                    </svg>
